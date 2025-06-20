@@ -21,6 +21,15 @@ pub struct ElementDefinition {
     pub r#type: Option<Vec<ElementType>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub binding: Option<Binding>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extension: Option<Extension>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Extension {
+    url: String,
+    value_string: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -179,6 +188,10 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: Some(Extension {
+                    url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
+                    value_string: simple_extension.fce_property.to_owned(),
+                }),
             };
 
             let url_elem = ElementDefinition {
@@ -191,6 +204,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let value_elem = ElementDefinition {
@@ -216,6 +230,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                         .collect(),
                 ),
                 binding: None,
+                extension: None,
             };
 
             let mut differential = vec![root, url_elem, value_elem];
@@ -234,6 +249,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                         binding: Some(Binding {
                             value_set: vs.to_owned(),
                         }),
+                        extension: None,
                     };
                     differential.push(elem);
                 }
@@ -252,6 +268,10 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: Some(Extension {
+                    url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
+                    value_string: complex_extension.fce_property.to_owned(),
+                }),
             };
 
             let base_elem = ElementDefinition {
@@ -266,6 +286,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 }),
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let url_elem = ElementDefinition {
@@ -278,6 +299,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let value_elem = ElementDefinition {
@@ -290,6 +312,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let mut nested: Vec<ElementDefinition> = Vec::new();
@@ -332,6 +355,10 @@ pub fn emit_nested(
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: Some(Extension {
+                    url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
+                    value_string: simple_extension.fce_property.to_owned(),
+                }),
             };
 
             let base_elem_ptr = ElementPointer {
@@ -349,6 +376,7 @@ pub fn emit_nested(
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let value_elem = ElementDefinition {
@@ -374,6 +402,7 @@ pub fn emit_nested(
                         .collect(),
                 ),
                 binding: None,
+                extension: None,
             };
 
             let value_elem_ptr = ElementPointer {
@@ -397,6 +426,7 @@ pub fn emit_nested(
                         binding: Some(Binding {
                             value_set: vs.to_owned(),
                         }),
+                        extension: None,
                     };
                     differential.push(elem);
                 }
@@ -415,6 +445,10 @@ pub fn emit_nested(
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: Some(Extension {
+                    url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
+                    value_string: complex_extension.fce_property.to_owned(),
+                }),
             };
 
             let base_elem_ptr = ElementPointer {
@@ -434,6 +468,7 @@ pub fn emit_nested(
                 }),
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let extension_elem_ptr = ElementPointer {
@@ -451,6 +486,7 @@ pub fn emit_nested(
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let value_elem = ElementDefinition {
@@ -463,6 +499,7 @@ pub fn emit_nested(
                 slicing: None,
                 r#type: None,
                 binding: None,
+                extension: None,
             };
 
             let mut nested: Vec<ElementDefinition> = Vec::new();
