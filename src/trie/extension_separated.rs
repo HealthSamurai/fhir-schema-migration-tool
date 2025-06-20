@@ -454,7 +454,7 @@ impl ComplexExtension {
         let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
         for (name, source_child) in &source_node.children {
             match source_child {
-                path::Node::Normal(normal_node) => {
+                path::Node::Normal(_) => {
                     errors.push(Error::NonExtensionInsideExtension);
                 }
                 path::Node::Extension(extension_node) => {
