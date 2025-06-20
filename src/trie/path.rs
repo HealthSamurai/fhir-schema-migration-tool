@@ -106,6 +106,12 @@ pub struct InferredNode {
     pub children: BTreeMap<String, Node>,
 }
 
+impl Default for Forest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Forest {
     pub fn new() -> Self {
         Self {
@@ -128,8 +134,7 @@ impl Forest {
 impl Trie {
     pub fn build_from(source_trie: &raw::Trie) -> Self {
         let root = Node::build_from(&source_trie.root);
-        let trie = Self { root: root };
-        trie
+        Self { root }
     }
 }
 
@@ -146,7 +151,7 @@ impl Node {
                 (AttributeKind::Poly(attribute_kind_poly), None) => {
                     Node::Normal(NormalNode::Polymorphic(PolymorphicNode {
                         array: attribute.array,
-                        children: children,
+                        children,
                         id: attribute.id.to_owned(),
                         path: attribute.path.to_owned(),
                         required: attribute.required,
@@ -158,7 +163,7 @@ impl Node {
                 (AttributeKind::Poly(attribute_kind_poly), Some(fce)) => {
                     Node::Extension(Extension::Polymorphic(PolymorphicExtension {
                         array: attribute.array,
-                        children: children,
+                        children,
                         id: attribute.id.to_owned(),
                         path: attribute.path.to_owned(),
                         required: attribute.required,
@@ -171,7 +176,7 @@ impl Node {
                 (AttributeKind::Concrete(attribute_kind_concrete), None) => {
                     Node::Normal(NormalNode::Concrete(ConcreteNode {
                         array: attribute.array,
-                        children: children,
+                        children,
                         id: attribute.id.to_owned(),
                         refers: attribute_kind_concrete.refers.to_owned(),
                         required: attribute.required,
@@ -184,7 +189,7 @@ impl Node {
                 (AttributeKind::Concrete(attribute_kind_concrete), Some(fce)) => {
                     Node::Extension(Extension::Concrete(ConcreteExtension {
                         array: attribute.array,
-                        children: children,
+                        children,
                         id: attribute.id.to_owned(),
                         refers: attribute_kind_concrete.refers.to_owned(),
                         required: attribute.required,
@@ -202,7 +207,7 @@ impl Node {
                         open: attribute_kind_complex.open,
                         required: attribute.required,
                         resource_type: attribute.resource_type.to_owned(),
-                        children: children,
+                        children,
                     }))
                 }
                 (AttributeKind::Complex(attribute_kind_complex), Some(fce)) => {
@@ -212,12 +217,12 @@ impl Node {
                         open: attribute_kind_complex.open,
                         required: attribute.required,
                         resource_type: attribute.resource_type.to_owned(),
-                        children: children,
+                        children,
                         fce: fce.to_owned(),
                     }))
                 }
             },
-            None => Node::Normal(NormalNode::Inferred(InferredNode { children: children })),
+            None => Node::Normal(NormalNode::Inferred(InferredNode { children })),
         }
     }
 }

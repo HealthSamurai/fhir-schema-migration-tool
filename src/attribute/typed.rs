@@ -241,28 +241,26 @@ impl Attribute {
                     errors.push(InvalidConcrete::RefersOnNonReferenceType(target.clone()).into());
                 }
 
-                let Some(resource_type) = resource_type else {
-                    return None;
-                };
+                let resource_type = resource_type?;
 
                 let kind = AttributeKind::Concrete(AttributeKindConcrete {
-                    target: target,
-                    value_set: value_set,
+                    target,
+                    value_set,
                     refers: attr.refers.to_owned(),
                 });
-                return Some(Attribute {
+                Some(Attribute {
                     id: attr.id.to_owned(),
                     path: attr.path.to_owned(),
-                    resource_type: resource_type,
-                    kind: kind,
+                    resource_type,
+                    kind,
                     array: attr.is_collection.is_some_and(|x| x),
                     required: attr.is_required.is_some_and(|x| x),
                     fce: attr.extension_url.to_owned(),
-                });
+                })
             }
             Err(e) => {
                 errors.push(e);
-                return None;
+                None
             }
         }
     }
@@ -314,20 +312,18 @@ impl Attribute {
         }
         let targets = targets;
 
-        let Some(resource_type) = resource_type else {
-            return None;
-        };
+        let resource_type = resource_type?;
 
         if targets.is_empty() {
             return None;
         }
 
-        let kind = AttributeKind::Poly(AttributeKindPoly { targets: targets });
+        let kind = AttributeKind::Poly(AttributeKindPoly { targets });
         Some(Attribute {
             id: attr.id.to_owned(),
             path: attr.path.to_owned(),
-            resource_type: resource_type,
-            kind: kind,
+            resource_type,
+            kind,
             array: attr.is_collection.is_some_and(|x| x),
             required: attr.is_required.is_some_and(|x| x),
             fce: attr.extension_url.to_owned(),
@@ -361,9 +357,7 @@ impl Attribute {
             errors.push(InvalidComplex::RefersPresent.into());
         }
 
-        let Some(resource_type) = resource_type else {
-            return None;
-        };
+        let resource_type = resource_type?;
 
         let kind = AttributeKind::Complex(AttributeKindComplex {
             open: attr.is_open.is_some_and(|x| x),
@@ -371,8 +365,8 @@ impl Attribute {
         Some(Attribute {
             id: attr.id.to_owned(),
             path: attr.path.to_owned(),
-            resource_type: resource_type,
-            kind: kind,
+            resource_type,
+            kind,
             array: attr.is_collection.is_some_and(|x| x),
             required: attr.is_required.is_some_and(|x| x),
             fce: attr.extension_url.to_owned(),

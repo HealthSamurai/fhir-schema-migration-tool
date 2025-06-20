@@ -140,10 +140,10 @@ pub fn emit_extension(
     let mut base_path = "Extension".to_owned();
     for path_element in path {
         base_path.push('.');
-        base_path.push_str(&path_element);
+        base_path.push_str(path_element);
     }
 
-    let sd = StructureDefinition {
+    StructureDefinition {
         url: url.to_owned(),
         differential: StructureDefinitionDifferential {
             element: emit_differential(url, extension),
@@ -163,9 +163,7 @@ pub fn emit_extension(
         },
         kind: "constraint".to_owned(),
         r#type: "Extension".to_owned(),
-    };
-
-    sd
+    }
 }
 
 pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<ElementDefinition> {
@@ -209,15 +207,11 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                         .iter()
                         .map(|(target_type, target_info)| ElementType {
                             code: target_type.to_owned(),
-                            target_profile: if let Some(refs) = &target_info.refers {
-                                Some(
-                                    refs.iter()
-                                        .map(|tref| format!("http://hl7.org/fhir/{}", tref))
-                                        .collect(),
-                                )
-                            } else {
-                                None
-                            },
+                            target_profile: target_info.refers.as_ref().map(|refs| {
+                                refs.iter()
+                                    .map(|tref| format!("http://hl7.org/fhir/{}", tref))
+                                    .collect()
+                            }),
                         })
                         .collect(),
                 ),
@@ -230,7 +224,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 if let Some(vs) = &target.value_set {
                     let elem = ElementDefinition {
                         id: format!("Extension.value[x]:value{}", type_name),
-                        path: format!("Extension.value[x]"),
+                        path: "Extension.value[x]".to_owned(),
                         slice_name: Some(format!("value{}", type_name)),
                         min: None,
                         max: None,
@@ -330,7 +324,7 @@ pub fn emit_nested(
         inverted::Extension::Simple(simple_extension) => {
             let base_elem = ElementDefinition {
                 id: format!("{}:{}", ptr.id, simple_extension.fce_property),
-                path: format!("{}", ptr.path),
+                path: ptr.path.to_owned(),
                 slice_name: Some(simple_extension.fce_property.to_owned()),
                 min: Some(0),
                 max: Some("*".to_owned()),
@@ -371,15 +365,11 @@ pub fn emit_nested(
                         .iter()
                         .map(|(target_type, target_info)| ElementType {
                             code: target_type.to_owned(),
-                            target_profile: if let Some(refs) = &target_info.refers {
-                                Some(
-                                    refs.iter()
-                                        .map(|tref| format!("http://hl7.org/fhir/{}", tref))
-                                        .collect(),
-                                )
-                            } else {
-                                None
-                            },
+                            target_profile: target_info.refers.as_ref().map(|refs| {
+                                refs.iter()
+                                    .map(|tref| format!("http://hl7.org/fhir/{}", tref))
+                                    .collect()
+                            }),
                         })
                         .collect(),
                 ),
@@ -397,7 +387,7 @@ pub fn emit_nested(
                 if let Some(vs) = &target.value_set {
                     let elem = ElementDefinition {
                         id: format!("{}:value{}", value_elem_ptr.id, type_name),
-                        path: format!("{}", value_elem_ptr.path),
+                        path: value_elem_ptr.path.to_owned(),
                         slice_name: Some(format!("value{}", type_name)),
                         min: None,
                         max: None,
@@ -417,7 +407,7 @@ pub fn emit_nested(
         inverted::Extension::Complex(complex_extension) => {
             let base_elem = ElementDefinition {
                 id: format!("{}:{}", ptr.id, complex_extension.fce_property),
-                path: format!("{}", ptr.path),
+                path: ptr.path.to_owned(),
                 slice_name: None,
                 min: Some(0),
                 max: Some("*".to_owned()),

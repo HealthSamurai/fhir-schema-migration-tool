@@ -69,6 +69,12 @@ impl Trie {
     }
 }
 
+impl Default for Forest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Forest {
     pub fn new() -> Self {
         Self {

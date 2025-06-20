@@ -138,6 +138,12 @@ pub enum Error {
     PolymorphicChildIsRequired,
 }
 
+impl Default for Forest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Forest {
     pub fn new() -> Self {
         Self {
@@ -169,7 +175,7 @@ impl Trie {
                 NormalNode::build_from(&extension.convert_to_normal_node())
             }
         };
-        let trie = Self { root: root };
+        let trie = Self { root };
         (trie, errors)
     }
 }

@@ -112,6 +112,12 @@ pub enum Error {
     DuplicateExtensionUrl,
 }
 
+impl Default for Forest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Forest {
     pub fn new() -> Self {
         Self {
@@ -136,7 +142,7 @@ impl Forest {
 impl Trie {
     pub fn build_from(source_trie: &extension_separated::Trie) -> (Self, Vec<Error>) {
         let (root, errors) = NormalNode::build_from(&source_trie.root);
-        let trie = Self { root: root };
+        let trie = Self { root };
         (trie, errors)
     }
 }
