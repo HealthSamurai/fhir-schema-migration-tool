@@ -85,7 +85,7 @@ impl Forest {
         trie.insert(attr)
     }
 
-    pub fn build_from_attributes(attrs: &[Attribute]) -> (Self, Option<Vec<Error>>) {
+    pub fn build_from_attributes(attrs: &[Attribute]) -> (Self, Vec<Error>) {
         let mut forest = Self::new();
         let mut errors: Vec<Error> = Vec::new();
         for attr in attrs {
@@ -95,10 +95,6 @@ impl Forest {
             }
         }
 
-        if errors.is_empty() {
-            (forest, None)
-        } else {
-            (forest, Some(errors))
-        }
+        (forest, errors)
     }
 }

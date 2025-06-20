@@ -668,11 +668,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     let (raw_forest, errors) = trie::raw::Forest::build_from_attributes(&typed_attributes);
-    if let Some(errors) = errors {
+    if !errors.is_empty() {
         had_errors = true;
-        for error in errors {
-            eprintln!("{}", error);
-        }
+    }
+    for error in errors {
+        eprintln!("{}", error);
     }
 
     let path_forest = trie::path::Forest::build_from(&raw_forest);
