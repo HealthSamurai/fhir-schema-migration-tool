@@ -1,4 +1,4 @@
-use serde::{Serialize, de::value};
+use serde::Serialize;
 use thiserror::Error;
 
 use crate::trie::inverted;
@@ -44,7 +44,18 @@ pub struct ElementSlicing {
 #[derive(Debug, Clone, Serialize)]
 pub struct StructureDefinition {
     pub url: String,
+    pub name: String,
+    pub derivation: String,
+    pub context: StructureDefinitionContext,
     pub differential: StructureDefinitionDifferential,
+    pub kind: String,
+    pub r#type: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StructureDefinitionContext {
+    pub r#type: String,
+    pub code: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -67,8 +78,8 @@ fn collect_extensions_recursive(
     let mut errors: Vec<Error> = Vec::new();
 
     match node {
-        inverted::NormalNode::Concrete(concrete_node) => (),
-        inverted::NormalNode::Polymorphic(polymorphic_node) => (),
+        inverted::NormalNode::Concrete(_) => (),
+        inverted::NormalNode::Polymorphic(_) => (),
         inverted::NormalNode::Complex(complex_node) => {
             for (field, child) in &complex_node.children {
                 let mut child_path = path.to_owned();
@@ -132,16 +143,26 @@ pub fn emit_extension(
         base_path.push_str(&path_element);
     }
 
-    let base_pointer = ElementPointer {
-        path: base_path.clone(),
-        id: base_path.clone(),
-    };
-
     let sd = StructureDefinition {
         url: url.to_owned(),
         differential: StructureDefinitionDifferential {
             element: emit_differential(url, extension),
         },
+        name: match extension {
+            inverted::Extension::Simple(simple_extension) => {
+                simple_extension.fce_property.to_owned()
+            }
+            inverted::Extension::Complex(complex_extension) => {
+                complex_extension.fce_property.to_owned()
+            }
+        },
+        derivation: "constraint".to_owned(),
+        context: StructureDefinitionContext {
+            r#type: "element".to_owned(),
+            code: format!("{}.{}", rt, path.join(".")),
+        },
+        kind: "constraint".to_owned(),
+        r#type: "Extension".to_owned(),
     };
 
     sd
