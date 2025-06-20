@@ -636,22 +636,15 @@ fn main() -> anyhow::Result<()> {
         let file = BufReader::new(file);
 
         let aidbox_attribute = if is_json(path) {
-            match attribute::aidbox::Attribute::from_json(file) {
-                Ok(attribute) => attribute,
-                Err(error) => {
-                    had_errors = true;
-                    eprintln!("{}", error);
-                    continue;
-                }
-            }
+            attribute::aidbox::Attribute::from_json(file)
         } else {
-            match attribute::aidbox::Attribute::from_yaml(file) {
-                Ok(attribute) => attribute,
-                Err(error) => {
-                    had_errors = true;
-                    eprintln!("{}", error);
-                    continue;
-                }
+            attribute::aidbox::Attribute::from_yaml(file)
+        };
+        let aidbox_attribute = match aidbox_attribute {
+            Ok(attribute) => attribute,
+            Err(error) => {
+                eprintln!("{}", error);
+                continue;
             }
         };
 

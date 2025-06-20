@@ -2,6 +2,7 @@ use std::io::Read;
 
 use serde::Deserialize;
 use serde_json::Value;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +69,15 @@ pub struct Attribute {
     pub refers: Option<Vec<String>>,
 }
 
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Could not parse Attribute resource as JSON (malformed JSON or invalid resource)")]
+    InvalidJson(#[from] serde_json::Error),
+
+    #[error("Could not parse Attribute resource as YAML (malformed YAML or invalid resource)")]
+    InvalidYaml(#[from] serde_yaml::Error),
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reference {
@@ -76,11 +86,11 @@ pub struct Reference {
 }
 
 impl Attribute {
-    pub fn from_json(reader: impl Read) -> Result<Self, serde_json::Error> {
-        serde_json::from_reader(reader)
+    pub fn from_json(reader: impl Read) -> Result<Self, Error> {
+        serde_json::from_reader(reader).map_err(|e| e.into())
     }
 
-    pub fn from_yaml(reader: impl Read) -> Result<Self, serde_yaml::Error> {
-        serde_yaml::from_reader(reader)
+    pub fn from_yaml(reader: impl Read) -> Result<Self, Error> {
+        serde_yaml::from_reader(reader).map_err(|e| e.into())
     }
 }
