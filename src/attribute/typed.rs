@@ -379,7 +379,7 @@ impl Attribute {
         })
     }
 
-    pub fn read_attribute(attr: &aidbox::Attribute) -> Result<Self, Vec<InvalidAttributeError>> {
+    pub fn build_from(attr: &aidbox::Attribute) -> (Option<Self>, Vec<InvalidAttributeError>) {
         let mut errors: Vec<InvalidAttributeError> = Vec::new();
 
         Self::check_unsupported_properties(&mut errors, attr);
@@ -394,19 +394,6 @@ impl Attribute {
             }
         };
 
-        match (errors.is_empty(), typed_attr) {
-            (true, None) => unreachable!(),
-            (true, Some(attr)) => Ok(attr),
-            (false, None) => Err(errors),
-            (false, Some(attr)) => Err(errors),
-        }
-    }
-}
-
-impl TryFrom<aidbox::Attribute> for Attribute {
-    type Error = Vec<InvalidAttributeError>;
-
-    fn try_from(value: aidbox::Attribute) -> Result<Self, Self::Error> {
-        Self::read_attribute(&value)
+        (typed_attr, errors)
     }
 }

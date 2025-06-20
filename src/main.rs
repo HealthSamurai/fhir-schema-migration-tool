@@ -654,16 +654,17 @@ fn main() -> anyhow::Result<()> {
     let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
 
     for aidbox_attribute in aidbox_attributes {
-        match attribute::typed::Attribute::try_from(aidbox_attribute.clone()) {
-            Ok(typed_attribute) => typed_attributes.push(typed_attribute),
-            Err(errors) => {
-                had_errors = true;
-                for error in errors {
-                    eprintln!("{}", error);
-                }
-                continue;
-            }
+        let (typed_attribute, errors) = attribute::typed::Attribute::build_from(&aidbox_attribute);
+
+        if !errors.is_empty() {
+            had_errors = true;
         }
+
+        let Some(typed_attribute) = typed_attribute else {
+            continue;
+        };
+
+        typed_attributes.push(typed_attribute);
     }
 
     let (raw_forest, errors) = trie::raw::Forest::build_from_attributes(&typed_attributes);
