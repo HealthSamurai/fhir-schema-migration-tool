@@ -81,7 +81,7 @@ pub enum Error {
 fn collect_extensions_recursive(
     rt: &str,
     path: &[String],
-    node: &inverted::NormalNode,
+    node: inverted::NormalNode,
 ) -> (Vec<StructureDefinition>, Vec<Error>) {
     let mut result: Vec<StructureDefinition> = Vec::new();
     let mut errors: Vec<Error> = Vec::new();
@@ -90,7 +90,7 @@ fn collect_extensions_recursive(
         inverted::NormalNode::Concrete(_) => (),
         inverted::NormalNode::Polymorphic(_) => (),
         inverted::NormalNode::Complex(complex_node) => {
-            for (field, child) in &complex_node.children {
+            for (field, child) in complex_node.children {
                 let mut child_path = path.to_owned();
                 child_path.push(field.to_owned());
                 let (mut child_res, mut child_errors) =
@@ -99,13 +99,13 @@ fn collect_extensions_recursive(
                 errors.append(&mut child_errors);
             }
 
-            for (url, ext) in &complex_node.extension {
+            for (url, ext) in complex_node.extension {
                 let ext = emit_extension(rt, path, url, ext);
                 result.push(ext);
             }
         }
         inverted::NormalNode::Inferred(inferred_node) => {
-            for (field, child) in &inferred_node.children {
+            for (field, child) in inferred_node.children {
                 let mut child_path = path.to_owned();
                 child_path.push(field.to_owned());
                 let (mut child_res, mut child_errors) =
@@ -113,7 +113,7 @@ fn collect_extensions_recursive(
                 result.append(&mut child_res);
                 errors.append(&mut child_errors);
             }
-            for (url, ext) in &inferred_node.extension {
+            for (url, ext) in inferred_node.extension {
                 let ext = emit_extension(rt, path, url, ext);
                 result.push(ext);
             }
@@ -123,12 +123,12 @@ fn collect_extensions_recursive(
     (result, errors)
 }
 
-pub fn collect_extensions(forest: &inverted::Forest) -> (Vec<StructureDefinition>, Vec<Error>) {
+pub fn collect_extensions(forest: inverted::Forest) -> (Vec<StructureDefinition>, Vec<Error>) {
     let mut errors: Vec<Error> = Vec::new();
     let mut sds: Vec<StructureDefinition> = Vec::new();
-    for (rt, trie) in &forest.forest {
+    for (rt, trie) in forest.forest {
         let (mut extensions, mut collect_errors) =
-            collect_extensions_recursive(rt, &[], &trie.root);
+            collect_extensions_recursive(&rt, &[], trie.root);
         sds.append(&mut extensions);
         errors.append(&mut collect_errors);
     }
@@ -143,8 +143,8 @@ pub struct ElementPointer {
 pub fn emit_extension(
     rt: &str,
     path: &[String],
-    url: &str,
-    extension: &inverted::Extension,
+    url: String,
+    extension: inverted::Extension,
 ) -> StructureDefinition {
     let mut base_path = "Extension".to_owned();
     for path_element in path {
@@ -152,19 +152,19 @@ pub fn emit_extension(
         base_path.push_str(path_element);
     }
 
+    let name = match &extension {
+        inverted::Extension::Simple(simple_extension) => simple_extension.fce_property.to_owned(),
+        inverted::Extension::Complex(complex_extension) => {
+            complex_extension.fce_property.to_owned()
+        }
+    };
+
     StructureDefinition {
         url: url.to_owned(),
         differential: StructureDefinitionDifferential {
             element: emit_differential(url, extension),
         },
-        name: match extension {
-            inverted::Extension::Simple(simple_extension) => {
-                simple_extension.fce_property.to_owned()
-            }
-            inverted::Extension::Complex(complex_extension) => {
-                complex_extension.fce_property.to_owned()
-            }
-        },
+        name: name,
         derivation: "constraint".to_owned(),
         context: StructureDefinitionContext {
             r#type: "element".to_owned(),
@@ -179,7 +179,7 @@ pub fn emit_extension(
     }
 }
 
-pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<ElementDefinition> {
+pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<ElementDefinition> {
     match extension {
         inverted::Extension::Simple(simple_extension) => {
             let root = ElementDefinition {
@@ -194,7 +194,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 binding: None,
                 extension: Some(Extension {
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
-                    value_string: simple_extension.fce_property.to_owned(),
+                    value_string: simple_extension.fce_property,
                 }),
             };
 
@@ -204,7 +204,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 slice_name: None,
                 min: Some(1),
                 max: Some("1".to_owned()),
-                fixed_url: Some(url.to_owned()),
+                fixed_url: Some(url),
                 slicing: None,
                 r#type: None,
                 binding: None,
@@ -226,7 +226,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                         .map(|(target_type, target_info)| ElementType {
                             code: target_type.to_owned(),
                             target_profile: target_info.refers.as_ref().map(|refs| {
-                                refs.iter()
+                                refs.into_iter()
                                     .map(|tref| format!("http://hl7.org/fhir/{}", tref))
                                     .collect()
                             }),
@@ -239,7 +239,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
 
             let mut differential = vec![root, url_elem, value_elem];
 
-            for (type_name, target) in &simple_extension.targets {
+            for (type_name, target) in simple_extension.targets {
                 if let Some(vs) = &target.value_set {
                     let elem = ElementDefinition {
                         id: format!("Extension.value[x]:value{}", type_name),
@@ -274,7 +274,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 binding: None,
                 extension: Some(Extension {
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
-                    value_string: complex_extension.fce_property.to_owned(),
+                    value_string: complex_extension.fce_property,
                 }),
             };
 
@@ -326,7 +326,7 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
                 id: "Extension.extension".to_owned(),
             };
 
-            for (url, child) in &complex_extension.extension {
+            for (url, child) in complex_extension.extension {
                 nested.append(&mut emit_nested(&ptr, url, child));
             }
 
@@ -344,8 +344,8 @@ pub fn emit_differential(url: &str, extension: &inverted::Extension) -> Vec<Elem
 
 pub fn emit_nested(
     ptr: &ElementPointer,
-    url: &str,
-    extension: &inverted::Extension,
+    url: String,
+    extension: inverted::Extension,
 ) -> Vec<ElementDefinition> {
     match extension {
         inverted::Extension::Simple(simple_extension) => {
@@ -416,7 +416,7 @@ pub fn emit_nested(
 
             let mut differential = vec![base_elem, url_elem, value_elem];
 
-            for (type_name, target) in &simple_extension.targets {
+            for (type_name, target) in simple_extension.targets {
                 if let Some(vs) = &target.value_set {
                     let elem = ElementDefinition {
                         id: format!("{}:value{}", value_elem_ptr.id, type_name),
@@ -508,7 +508,7 @@ pub fn emit_nested(
 
             let mut nested: Vec<ElementDefinition> = Vec::new();
 
-            for (url, child) in &complex_extension.extension {
+            for (url, child) in complex_extension.extension {
                 nested.append(&mut emit_nested(&extension_elem_ptr, url, child));
             }
 

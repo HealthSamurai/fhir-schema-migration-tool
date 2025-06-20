@@ -85,7 +85,7 @@ fn main() -> Result<(), String> {
     let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
 
     for aidbox_attribute in aidbox_attributes {
-        let (typed_attribute, errors) = attribute::typed::Attribute::build_from(&aidbox_attribute);
+        let (typed_attribute, errors) = attribute::typed::Attribute::build_from(aidbox_attribute);
 
         if !errors.is_empty() {
             had_errors = true;
@@ -106,9 +106,9 @@ fn main() -> Result<(), String> {
         eprintln!("{}", error);
     }
 
-    let path_forest = trie::path::Forest::build_from(&raw_forest);
+    let path_forest = trie::path::Forest::build_from(raw_forest);
     let (extension_separated_forest, errors) =
-        trie::extension_separated::Forest::build_from(&path_forest);
+        trie::extension_separated::Forest::build_from(path_forest);
 
     if !errors.is_empty() {
         had_errors = true;
@@ -117,7 +117,7 @@ fn main() -> Result<(), String> {
         eprintln!("{}", error);
     }
 
-    let (inverted_forest, errors) = trie::inverted::Forest::build_from(&extension_separated_forest);
+    let (inverted_forest, errors) = trie::inverted::Forest::build_from(extension_separated_forest);
     if !errors.is_empty() {
         had_errors = true;
     }
@@ -125,7 +125,7 @@ fn main() -> Result<(), String> {
         eprintln!("{}", error);
     }
 
-    let (exts, errors) = trie::fhir::collect_extensions(&inverted_forest);
+    let (exts, errors) = trie::fhir::collect_extensions(inverted_forest);
 
     if !errors.is_empty() {
         had_errors = true;

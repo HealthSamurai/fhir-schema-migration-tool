@@ -125,11 +125,11 @@ impl Forest {
         }
     }
 
-    pub fn build_from(source_forest: &extension_separated::Forest) -> (Self, Vec<Error>) {
+    pub fn build_from(source_forest: extension_separated::Forest) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         let mut forest = Self::new();
 
-        for (resource_type, trie) in &source_forest.forest {
+        for (resource_type, trie) in source_forest.forest {
             let (trie, mut build_errors) = Trie::build_from(trie);
             errors.append(&mut build_errors);
             forest.forest.insert(resource_type.to_owned(), trie);
@@ -140,15 +140,15 @@ impl Forest {
 }
 
 impl Trie {
-    pub fn build_from(source_trie: &extension_separated::Trie) -> (Self, Vec<Error>) {
-        let (root, errors) = NormalNode::build_from(&source_trie.root);
+    pub fn build_from(source_trie: extension_separated::Trie) -> (Self, Vec<Error>) {
+        let (root, errors) = NormalNode::build_from(source_trie.root);
         let trie = Self { root };
         (trie, errors)
     }
 }
 
 impl NormalNode {
-    pub fn build_from(source_node: &extension_separated::NormalNode) -> (Self, Vec<Error>) {
+    pub fn build_from(source_node: extension_separated::NormalNode) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         match source_node {
             extension_separated::NormalNode::Concrete(concrete_node) => {
@@ -174,72 +174,73 @@ impl NormalNode {
 }
 
 impl ConcreteNode {
-    pub fn build_from(source_node: &extension_separated::ConcreteNode) -> Self {
+    pub fn build_from(source_node: extension_separated::ConcreteNode) -> Self {
         Self {
             array: source_node.array,
-            id: source_node.id.to_owned(),
-            refers: source_node.refers.to_owned(),
+            id: source_node.id,
+            refers: source_node.refers,
             required: source_node.required,
-            target: source_node.target.to_owned(),
-            value_set: source_node.value_set.to_owned(),
+            target: source_node.target,
+            value_set: source_node.value_set,
         }
     }
 }
 
 impl PolymorphicLeaf {
-    pub fn build_from(source_node: &extension_separated::PolymorphicLeaf) -> Self {
+    pub fn build_from(source_node: extension_separated::PolymorphicLeaf) -> Self {
         Self {
-            id: source_node.id.to_owned(),
-            refers: source_node.refers.to_owned(),
-            target: source_node.target.to_owned(),
-            value_set: source_node.value_set.to_owned(),
+            id: source_node.id,
+            refers: source_node.refers,
+            target: source_node.target,
+            value_set: source_node.value_set,
         }
     }
 }
 
 impl PolymorphicNode {
-    pub fn build_from(source_node: &extension_separated::PolymorphicNode) -> Self {
+    pub fn build_from(source_node: extension_separated::PolymorphicNode) -> Self {
         let children: BTreeMap<String, PolymorphicLeaf> = source_node
             .children
-            .iter()
-            .map(|(name, child)| (name.to_owned(), PolymorphicLeaf::build_from(child)))
+            .into_iter()
+            .map(|(name, child)| (name, PolymorphicLeaf::build_from(child)))
             .collect();
 
         Self {
             array: source_node.array,
             children,
-            id: source_node.id.to_owned(),
-            path: source_node.path.to_owned(),
+            id: source_node.id,
+            path: source_node.path,
             required: source_node.required,
-            targets: source_node.targets.to_owned(),
+            targets: source_node.targets,
         }
     }
 }
 
 impl ComplexNode {
-    pub fn build_from(source_node: &extension_separated::ComplexNode) -> (Self, Vec<Error>) {
+    pub fn build_from(source_node: extension_separated::ComplexNode) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         let mut children: BTreeMap<String, NormalNode> = BTreeMap::new();
         let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
-        for (name, source_child) in &source_node.children {
+        for (name, source_child) in source_node.children {
             let (node, mut build_errors) = NormalNode::build_from(source_child);
             errors.append(&mut build_errors);
-            children.insert(name.to_owned(), node);
+            children.insert(name, node);
         }
 
-        for (name, source_ext) in &source_node.extension {
+        for (name, source_ext) in source_node.extension {
+            let url = source_ext.get_url().to_owned();
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
-            if extension.contains_key(source_ext.get_url()) {
+            if extension.contains_key(&url) {
                 errors.push(Error::DuplicateExtensionUrl)
             } else {
-                extension.insert(source_ext.get_url().to_owned(), node);
+                extension.insert(url, node);
             }
         }
 
         let node = Self {
             array: source_node.array,
-            id: source_node.id.to_owned(),
+            id: source_node.id,
             open: source_node.open,
             required: source_node.required,
             children,
@@ -251,23 +252,24 @@ impl ComplexNode {
 }
 
 impl InferredNode {
-    pub fn build_from(source_node: &extension_separated::InferredNode) -> (Self, Vec<Error>) {
+    pub fn build_from(source_node: extension_separated::InferredNode) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         let mut children: BTreeMap<String, NormalNode> = BTreeMap::new();
         let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
-        for (name, source_child) in &source_node.children {
+        for (name, source_child) in source_node.children {
             let (node, mut build_errors) = NormalNode::build_from(source_child);
             errors.append(&mut build_errors);
-            children.insert(name.to_owned(), node);
+            children.insert(name, node);
         }
 
-        for (name, source_ext) in &source_node.extension {
+        for (name, source_ext) in source_node.extension {
+            let url = source_ext.get_url().to_owned();
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
-            if extension.contains_key(source_ext.get_url()) {
+            if extension.contains_key(&url) {
                 errors.push(Error::DuplicateExtensionUrl)
             } else {
-                extension.insert(source_ext.get_url().to_owned(), node);
+                extension.insert(url, node);
             }
         }
 
@@ -282,8 +284,8 @@ impl InferredNode {
 
 impl Extension {
     pub fn build_from(
-        source_node: &extension_separated::Extension,
-        fce_property: &str,
+        source_node: extension_separated::Extension,
+        fce_property: String,
     ) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         match source_node {
@@ -309,50 +311,50 @@ impl Extension {
 
 impl SimpleExtension {
     pub fn build_from_concrete(
-        source_node: &extension_separated::ConcreteExtension,
-        fce_property: &str,
+        source_node: extension_separated::ConcreteExtension,
+        fce_property: String,
     ) -> Self {
         Self {
             array: source_node.array,
             targets: BTreeMap::from([(
-                source_node.target.to_owned(),
+                source_node.target,
                 ExtensionTarget {
-                    id: source_node.id.to_owned(),
-                    refers: source_node.refers.to_owned(),
-                    value_set: source_node.value_set.to_owned(),
+                    id: source_node.id.clone(),
+                    refers: source_node.refers,
+                    value_set: source_node.value_set,
                 },
             )]),
-            fce_property: fce_property.to_owned(),
-            id: source_node.id.to_owned(),
+            fce_property: fce_property,
+            id: source_node.id,
             required: source_node.required,
         }
     }
 
     pub fn build_from_polymorphic(
-        source_node: &extension_separated::PolymorphicExtension,
-        fce_property: &str,
+        source_node: extension_separated::PolymorphicExtension,
+        fce_property: String,
     ) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         let mut targets: BTreeMap<String, ExtensionTarget> = BTreeMap::new();
         let declared_targets: HashSet<String> =
             HashSet::from_iter(source_node.targets.iter().cloned());
-        for (name, target) in &source_node.children {
-            if !declared_targets.contains(name) {
+        for (name, target) in source_node.children {
+            if !declared_targets.contains(&name) {
                 errors.push(Error::PolymorphicUndeclaredTarget)
             };
             let target = ExtensionTarget {
-                id: target.id.to_owned(),
-                refers: target.refers.to_owned(),
-                value_set: target.value_set.to_owned(),
+                id: target.id,
+                refers: target.refers,
+                value_set: target.value_set,
             };
-            targets.insert(name.to_owned(), target);
+            targets.insert(name, target);
         }
 
         let node = Self {
             array: source_node.array,
             targets,
-            fce_property: fce_property.to_owned(),
-            id: source_node.id.to_owned(),
+            fce_property: fce_property,
+            id: source_node.id,
             required: source_node.required,
         };
 
@@ -362,26 +364,27 @@ impl SimpleExtension {
 
 impl ComplexExtension {
     pub fn build_from(
-        source_node: &extension_separated::ComplexExtension,
-        fce_property: &str,
+        source_node: extension_separated::ComplexExtension,
+        fce_property: String,
     ) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
 
-        for (name, source_ext) in &source_node.extension {
+        for (name, source_ext) in source_node.extension {
+            let url = source_ext.get_url().to_owned();
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
-            if extension.contains_key(source_ext.get_url()) {
+            if extension.contains_key(&url) {
                 errors.push(Error::DuplicateExtensionUrl)
             } else {
-                extension.insert(source_ext.get_url().to_owned(), node);
+                extension.insert(url, node);
             }
         }
 
         let node = Self {
             array: source_node.array,
-            fce_property: fce_property.to_owned(),
-            id: source_node.id.to_owned(),
+            fce_property: fce_property,
+            id: source_node.id,
             open: source_node.open,
             required: source_node.required,
             extension,

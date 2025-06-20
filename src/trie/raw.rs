@@ -39,7 +39,7 @@ impl Node {
 }
 
 impl Trie {
-    fn insert(&mut self, attr: &Attribute) -> Result<(), Error> {
+    fn insert(&mut self, attr: Attribute) -> Result<(), Error> {
         assert_eq!(
             self.resource_type, attr.resource_type,
             "PathTrie resource type mismatch (trie type: {}; attribute type: {}",
@@ -56,7 +56,7 @@ impl Trie {
         if let Some(existing) = &node.attribute {
             Err(Error::AlreadyExists(existing.path.join(".")))
         } else {
-            node.attribute = Some(attr.clone());
+            node.attribute = Some(attr);
             Ok(())
         }
     }
@@ -82,7 +82,7 @@ impl Forest {
         }
     }
 
-    pub fn insert(&mut self, attr: &Attribute) -> Result<(), Error> {
+    pub fn insert(&mut self, attr: Attribute) -> Result<(), Error> {
         let trie = self
             .forest
             .entry(attr.resource_type.to_owned())
@@ -95,7 +95,7 @@ impl Forest {
         let mut forest = Self::new();
         let mut errors: Vec<Error> = Vec::new();
         for attr in attrs {
-            match forest.insert(attr) {
+            match forest.insert(attr.to_owned()) {
                 Ok(_) => (),
                 Err(e) => errors.push(e),
             }

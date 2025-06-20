@@ -153,10 +153,9 @@ const STRING_TYPES: &[&str] = &[
 ];
 
 impl Attribute {
-    fn check_unsupported_properties(
-        errors: &mut Vec<InvalidAttributeError>,
-        attr: &aidbox::Attribute,
-    ) {
+    fn check_unsupported_properties(attr: &aidbox::Attribute) -> Vec<InvalidAttributeError> {
+        let mut errors: Vec<InvalidAttributeError> = Vec::new();
+
         if attr.schema.is_some() {
             errors.push(InvalidAttributeError::SchemaPresent);
         }
@@ -176,6 +175,8 @@ impl Attribute {
         if attr.order.is_some() {
             errors.push(InvalidAttributeError::OrderPresent);
         }
+
+        errors
     }
 
     fn parse_target(target: &aidbox::Reference) -> Result<String, InvalidAttributeError> {
@@ -197,11 +198,12 @@ impl Attribute {
     }
 
     pub fn read_target_attribute(
-        errors: &mut Vec<InvalidAttributeError>,
-        attr: &aidbox::Attribute,
-    ) -> Option<Attribute> {
+        attr: aidbox::Attribute,
+    ) -> (Option<Attribute>, Vec<InvalidAttributeError>) {
         assert!(attr.r#type.is_some());
         assert!(attr.union.is_none());
+
+        let mut errors: Vec<InvalidAttributeError> = Vec::new();
 
         // Already checked that not None
         let attr_type = attr.r#type.as_ref().unwrap();
@@ -241,36 +243,42 @@ impl Attribute {
                     errors.push(InvalidConcrete::RefersOnNonReferenceType(target.clone()).into());
                 }
 
-                let resource_type = resource_type?;
+                let Some(resource_type) = resource_type else {
+                    return (None, errors);
+                };
 
                 let kind = AttributeKind::Concrete(AttributeKindConcrete {
                     target,
                     value_set,
                     refers: attr.refers.to_owned(),
                 });
-                Some(Attribute {
-                    id: attr.id.to_owned(),
-                    path: attr.path.to_owned(),
+
+                let attr = Some(Attribute {
+                    id: attr.id,
+                    path: attr.path,
                     resource_type,
                     kind,
                     array: attr.is_collection.is_some_and(|x| x),
                     required: attr.is_required.is_some_and(|x| x),
                     fce: attr.extension_url.to_owned(),
-                })
+                });
+
+                (attr, errors)
             }
             Err(e) => {
                 errors.push(e);
-                None
+                (None, errors)
             }
         }
     }
 
     fn read_poly_attribute(
-        errors: &mut Vec<InvalidAttributeError>,
-        attr: &aidbox::Attribute,
-    ) -> Option<Attribute> {
+        attr: aidbox::Attribute,
+    ) -> (Option<Attribute>, Vec<InvalidAttributeError>) {
         assert!(attr.r#type.is_none());
         assert!(attr.union.is_some());
+
+        let mut errors: Vec<InvalidAttributeError> = Vec::new();
 
         // Already checked that not None
         let attr_types = attr.union.as_ref().unwrap();
@@ -312,30 +320,35 @@ impl Attribute {
         }
         let targets = targets;
 
-        let resource_type = resource_type?;
+        let Some(resource_type) = resource_type else {
+            return (None, errors);
+        };
 
         if targets.is_empty() {
-            return None;
+            return (None, errors);
         }
 
         let kind = AttributeKind::Poly(AttributeKindPoly { targets });
-        Some(Attribute {
-            id: attr.id.to_owned(),
-            path: attr.path.to_owned(),
+        let attr = Some(Attribute {
+            id: attr.id,
+            path: attr.path,
             resource_type,
             kind,
             array: attr.is_collection.is_some_and(|x| x),
             required: attr.is_required.is_some_and(|x| x),
-            fce: attr.extension_url.to_owned(),
-        })
+            fce: attr.extension_url,
+        });
+
+        (attr, errors)
     }
 
     fn read_complex_attribute(
-        errors: &mut Vec<InvalidAttributeError>,
-        attr: &aidbox::Attribute,
-    ) -> Option<Attribute> {
+        attr: aidbox::Attribute,
+    ) -> (Option<Attribute>, Vec<InvalidAttributeError>) {
         assert!(attr.r#type.is_none());
         assert!(attr.union.is_none());
+
+        let mut errors: Vec<InvalidAttributeError> = Vec::new();
 
         let resource_type = match Self::parse_target(&attr.resource) {
             Ok(rt) => Some(rt),
@@ -357,36 +370,36 @@ impl Attribute {
             errors.push(InvalidComplex::RefersPresent.into());
         }
 
-        let resource_type = resource_type?;
+        let Some(resource_type) = resource_type else {
+            return (None, errors);
+        };
 
         let kind = AttributeKind::Complex(AttributeKindComplex {
             open: attr.is_open.is_some_and(|x| x),
         });
-        Some(Attribute {
-            id: attr.id.to_owned(),
-            path: attr.path.to_owned(),
+        let attr = Some(Attribute {
+            id: attr.id,
+            path: attr.path,
             resource_type,
             kind,
             array: attr.is_collection.is_some_and(|x| x),
             required: attr.is_required.is_some_and(|x| x),
-            fce: attr.extension_url.to_owned(),
-        })
+            fce: attr.extension_url,
+        });
+        (attr, errors)
     }
 
-    pub fn build_from(attr: &aidbox::Attribute) -> (Option<Self>, Vec<InvalidAttributeError>) {
-        let mut errors: Vec<InvalidAttributeError> = Vec::new();
+    pub fn build_from(attr: aidbox::Attribute) -> (Option<Self>, Vec<InvalidAttributeError>) {
+        let mut errors: Vec<InvalidAttributeError> = Self::check_unsupported_properties(&attr);
 
-        Self::check_unsupported_properties(&mut errors, attr);
-
-        let typed_attr = match (&attr.r#type, &attr.union) {
-            (Some(_), None) => Self::read_target_attribute(&mut errors, attr),
-            (None, Some(_)) => Self::read_poly_attribute(&mut errors, attr),
-            (None, None) => Self::read_complex_attribute(&mut errors, attr),
-            (Some(_), Some(_)) => {
-                errors.push(InvalidAttributeError::InvalidKind);
-                None
-            }
+        let (typed_attr, mut read_errors) = match (&attr.r#type, &attr.union) {
+            (Some(_), None) => Self::read_target_attribute(attr),
+            (None, Some(_)) => Self::read_poly_attribute(attr),
+            (None, None) => Self::read_complex_attribute(attr),
+            (Some(_), Some(_)) => (None, vec![InvalidAttributeError::InvalidKind]),
         };
+
+        errors.append(&mut read_errors);
 
         (typed_attr, errors)
     }

@@ -119,10 +119,10 @@ impl Forest {
         }
     }
 
-    pub fn build_from(source_forest: &raw::Forest) -> Self {
+    pub fn build_from(source_forest: raw::Forest) -> Self {
         let mut forest = Self::new();
 
-        for (resource_type, trie) in &source_forest.forest {
+        for (resource_type, trie) in source_forest.forest {
             let trie = Trie::build_from(trie);
             forest.forest.insert(resource_type.to_owned(), trie);
         }
@@ -132,31 +132,31 @@ impl Forest {
 }
 
 impl Trie {
-    pub fn build_from(source_trie: &raw::Trie) -> Self {
-        let root = Node::build_from(&source_trie.root);
+    pub fn build_from(source_trie: raw::Trie) -> Self {
+        let root = Node::build_from(source_trie.root);
         Self { root }
     }
 }
 
 impl Node {
-    pub fn build_from(source_node: &raw::Node) -> Self {
+    pub fn build_from(source_node: raw::Node) -> Self {
         let children: BTreeMap<String, Node> = source_node
             .children
-            .iter()
+            .into_iter()
             .map(|(name, child)| (name.to_owned(), Self::build_from(child)))
             .collect();
 
-        match &source_node.attribute {
-            Some(attribute) => match (&attribute.kind, &attribute.fce) {
+        match source_node.attribute {
+            Some(attribute) => match (attribute.kind, attribute.fce) {
                 (AttributeKind::Poly(attribute_kind_poly), None) => {
                     Node::Normal(NormalNode::Polymorphic(PolymorphicNode {
                         array: attribute.array,
                         children,
-                        id: attribute.id.to_owned(),
-                        path: attribute.path.to_owned(),
+                        id: attribute.id,
+                        path: attribute.path,
                         required: attribute.required,
-                        resource_type: attribute.resource_type.to_owned(),
-                        targets: attribute_kind_poly.targets.to_owned(),
+                        resource_type: attribute.resource_type,
+                        targets: attribute_kind_poly.targets,
                     }))
                 }
 
@@ -164,12 +164,12 @@ impl Node {
                     Node::Extension(Extension::Polymorphic(PolymorphicExtension {
                         array: attribute.array,
                         children,
-                        id: attribute.id.to_owned(),
-                        path: attribute.path.to_owned(),
+                        id: attribute.id,
+                        path: attribute.path,
                         required: attribute.required,
-                        resource_type: attribute.resource_type.to_owned(),
-                        targets: attribute_kind_poly.targets.to_owned(),
-                        fce: fce.to_owned(),
+                        resource_type: attribute.resource_type,
+                        targets: attribute_kind_poly.targets,
+                        fce: fce,
                     }))
                 }
 
@@ -177,12 +177,12 @@ impl Node {
                     Node::Normal(NormalNode::Concrete(ConcreteNode {
                         array: attribute.array,
                         children,
-                        id: attribute.id.to_owned(),
-                        refers: attribute_kind_concrete.refers.to_owned(),
+                        id: attribute.id,
+                        refers: attribute_kind_concrete.refers,
                         required: attribute.required,
-                        resource_type: attribute.resource_type.to_owned(),
-                        target: attribute_kind_concrete.target.to_owned(),
-                        value_set: attribute_kind_concrete.value_set.to_owned(),
+                        resource_type: attribute.resource_type,
+                        target: attribute_kind_concrete.target,
+                        value_set: attribute_kind_concrete.value_set,
                     }))
                 }
 
@@ -190,20 +190,20 @@ impl Node {
                     Node::Extension(Extension::Concrete(ConcreteExtension {
                         array: attribute.array,
                         children,
-                        id: attribute.id.to_owned(),
-                        refers: attribute_kind_concrete.refers.to_owned(),
+                        id: attribute.id,
+                        refers: attribute_kind_concrete.refers,
                         required: attribute.required,
-                        resource_type: attribute.resource_type.to_owned(),
-                        target: attribute_kind_concrete.target.to_owned(),
-                        value_set: attribute_kind_concrete.value_set.to_owned(),
-                        fce: fce.to_owned(),
+                        resource_type: attribute.resource_type,
+                        target: attribute_kind_concrete.target,
+                        value_set: attribute_kind_concrete.value_set,
+                        fce: fce,
                     }))
                 }
 
                 (AttributeKind::Complex(attribute_kind_complex), None) => {
                     Node::Normal(NormalNode::Complex(ComplexNode {
                         array: attribute.array,
-                        id: attribute.id.to_owned(),
+                        id: attribute.id,
                         open: attribute_kind_complex.open,
                         required: attribute.required,
                         resource_type: attribute.resource_type.to_owned(),
@@ -213,12 +213,12 @@ impl Node {
                 (AttributeKind::Complex(attribute_kind_complex), Some(fce)) => {
                     Node::Extension(Extension::Complex(ComplexExtension {
                         array: attribute.array,
-                        id: attribute.id.to_owned(),
+                        id: attribute.id,
                         open: attribute_kind_complex.open,
                         required: attribute.required,
-                        resource_type: attribute.resource_type.to_owned(),
+                        resource_type: attribute.resource_type,
                         children,
-                        fce: fce.to_owned(),
+                        fce: fce,
                     }))
                 }
             },
@@ -228,36 +228,36 @@ impl Node {
 }
 
 impl Extension {
-    pub fn convert_to_normal_node(&self) -> NormalNode {
-        match &self {
+    pub fn convert_to_normal_node(self) -> NormalNode {
+        match self {
             Extension::Concrete(concrete_extension) => NormalNode::Concrete(ConcreteNode {
                 array: concrete_extension.array,
-                children: concrete_extension.children.to_owned(),
-                id: concrete_extension.id.to_owned(),
-                refers: concrete_extension.refers.to_owned(),
+                children: concrete_extension.children,
+                id: concrete_extension.id,
+                refers: concrete_extension.refers,
                 required: concrete_extension.required,
-                resource_type: concrete_extension.resource_type.to_owned(),
-                target: concrete_extension.target.to_owned(),
-                value_set: concrete_extension.value_set.to_owned(),
+                resource_type: concrete_extension.resource_type,
+                target: concrete_extension.target,
+                value_set: concrete_extension.value_set,
             }),
             Extension::Polymorphic(polymorphic_extension) => {
                 NormalNode::Polymorphic(PolymorphicNode {
                     array: polymorphic_extension.array,
-                    children: polymorphic_extension.children.to_owned(),
-                    id: polymorphic_extension.id.to_owned(),
-                    path: polymorphic_extension.path.to_owned(),
+                    children: polymorphic_extension.children,
+                    id: polymorphic_extension.id,
+                    path: polymorphic_extension.path,
                     required: polymorphic_extension.required,
-                    resource_type: polymorphic_extension.resource_type.to_owned(),
-                    targets: polymorphic_extension.targets.to_owned(),
+                    resource_type: polymorphic_extension.resource_type,
+                    targets: polymorphic_extension.targets,
                 })
             }
             Extension::Complex(complex_extension) => NormalNode::Complex(ComplexNode {
                 array: complex_extension.array,
-                id: complex_extension.id.to_owned(),
+                id: complex_extension.id,
                 open: complex_extension.open,
                 required: complex_extension.required,
-                resource_type: complex_extension.resource_type.to_owned(),
-                children: complex_extension.children.to_owned(),
+                resource_type: complex_extension.resource_type,
+                children: complex_extension.children,
             }),
         }
     }
