@@ -168,7 +168,11 @@ pub fn emit_extension(
         derivation: "constraint".to_owned(),
         context: StructureDefinitionContext {
             r#type: "element".to_owned(),
-            code: format!("{}.{}", rt, path.join(".")),
+            code: path.iter().fold(rt.to_owned(), |mut acc, component| {
+                acc.push('.');
+                acc.push_str(component);
+                acc
+            }),
         },
         kind: "constraint".to_owned(),
         r#type: "Extension".to_owned(),
