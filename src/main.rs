@@ -14,8 +14,12 @@ use walkdir::WalkDir;
 #[derive(Debug, Parser)]
 #[command(arg_required_else_help = true)]
 struct Args {
-    /// path with Attribute files
+    /// Path to Attribute files
     path: PathBuf,
+
+    /// Try to generate StructureDefinition resources even if there were errors
+    #[arg(long)]
+    ignore_errors: bool,
 }
 
 fn is_json(path: &Path) -> bool {
@@ -134,8 +138,10 @@ fn main() -> Result<(), String> {
         eprintln!("{}", error);
     }
 
-    for ext in exts {
-        println!("{}", serde_json::to_string_pretty(&ext).unwrap());
+    if !had_errors || args.ignore_errors {
+        for ext in exts {
+            println!("{}", serde_json::to_string_pretty(&ext).unwrap());
+        }
     }
 
     if had_errors {
