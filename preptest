@@ -1,0 +1,10 @@
+#!/bin/sh
+
+chmod 000 tests/noaccess/file.json
+chmod 000 tests/noaccess/dir
+
+cargo build > /dev/null 2>/dev/null
+target/debug/atr2sd "$@"
+
+chmod 644 tests/noaccess/file.json
+chmod 755 tests/noaccess/dir

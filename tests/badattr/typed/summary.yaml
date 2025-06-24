@@ -1,0 +1,7 @@
+id: Test.summary
+path:
+  - summary
+resource:
+  id: Test
+  resourceType: Entity
+isSummary: true

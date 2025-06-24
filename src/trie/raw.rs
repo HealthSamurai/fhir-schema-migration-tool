@@ -17,10 +17,14 @@ pub struct Trie {
     pub root: Node,
 }
 
+fn format_path(path: &[String]) -> String {
+    path.join(".")
+}
+
 #[derive(Debug, Clone, Error)]
 pub enum Error {
-    #[error("The node at path {0} already exists")]
-    AlreadyExists(String),
+    #[error("The node at path {} already exists", format_path(.0))]
+    AlreadyExists(Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -54,7 +58,7 @@ impl Trie {
                 .or_insert(Node::new());
         }
         if let Some(existing) = &node.attribute {
-            Err(Error::AlreadyExists(existing.path.join(".")))
+            Err(Error::AlreadyExists(existing.path.to_owned()))
         } else {
             node.attribute = Some(attr);
             Ok(())

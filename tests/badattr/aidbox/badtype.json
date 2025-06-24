@@ -1,0 +1,9 @@
+{
+  "id": "hello",
+  "path": [],
+  "resource": {
+    "id": "Patient",
+    "resourceType": "Entity"
+  },
+  "isOpen": "hello"
+}

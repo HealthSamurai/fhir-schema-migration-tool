@@ -1,0 +1,12 @@
+id: Patient.badKind
+path:
+  - badKind
+resource:
+  id: Patient
+  resourceType: Entity
+union:
+  - id: string
+    resourceType: Entity
+type:
+  id: string
+  resourceType: Entity

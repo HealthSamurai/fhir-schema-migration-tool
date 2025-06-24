@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use miette::Diagnostic;
 use thiserror::Error;
 
 use crate::trie::path;
@@ -111,7 +112,7 @@ pub struct InferredNode {
     pub extension: BTreeMap<String, Extension>,
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum Error {
     #[error("Todo")]
     Todo,
@@ -128,8 +129,16 @@ pub enum Error {
     #[error("Root is extension")]
     RootIsExtension,
 
-    #[error("Non-extension inside extension")]
-    NonExtensionInsideExtension,
+    #[error(
+        "Extension defined by Attribute {parent_id} must have only extension children. But found non-extension child {child_id}"
+    )]
+    NonExtensionInsideExtension { parent_id: String, child_id: String },
+
+    #[error("Missing attribute for child in extension.")]
+    MissingChild {
+        parent_id: String,
+        child_property: String,
+    },
 
     #[error("Polymorphic target can not set isArray")]
     PolymorphicChildHasArray,
@@ -460,8 +469,22 @@ impl ComplexExtension {
         let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
         for (name, source_child) in source_node.children {
             match source_child {
-                path::Node::Normal(_) => {
-                    errors.push(Error::NonExtensionInsideExtension);
+                path::Node::Normal(source_child) => {
+                    match source_child.get_id() {
+                        Some(child_id) => {
+                            errors.push(Error::NonExtensionInsideExtension {
+                                parent_id: source_node.id.clone(),
+                                child_id: child_id.to_owned(),
+                            });
+                        }
+                        None => {
+                            // Inferred node
+                            errors.push(Error::MissingChild {
+                                parent_id: source_node.id.clone(),
+                                child_property: name.clone(),
+                            })
+                        }
+                    }
                 }
                 path::Node::Extension(extension_node) => {
                     let (node, mut build_errors) = Extension::build_from(extension_node);

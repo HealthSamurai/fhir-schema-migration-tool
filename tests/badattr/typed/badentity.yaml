@@ -1,0 +1,6 @@
+id: Test.badentity
+path:
+  - badentity
+resource:
+  id: Test
+  resourceType: NotEntity

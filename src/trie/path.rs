@@ -262,3 +262,14 @@ impl Extension {
         }
     }
 }
+
+impl NormalNode {
+    pub fn get_id(&self) -> Option<&str> {
+        match &self {
+            NormalNode::Concrete(node) => Some(&node.id),
+            NormalNode::Polymorphic(node) => Some(&node.id),
+            NormalNode::Complex(node) => Some(&node.id),
+            NormalNode::Inferred(_) => None,
+        }
+    }
+}

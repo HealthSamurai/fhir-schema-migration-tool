@@ -1,0 +1,7 @@
+id: Test.unique
+path:
+  - unique
+resource:
+  id: Test
+  resourceType: Entity
+isUnique: true

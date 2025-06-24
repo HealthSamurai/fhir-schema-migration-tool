@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+use miette::Diagnostic;
 use thiserror::Error;
 
 use crate::attribute::aidbox;
@@ -40,30 +43,79 @@ pub struct AttributeKindComplex {
     pub open: bool,
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error, Diagnostic)]
+#[error("Attribute {id} is invalid")]
+#[diagnostic(code(E004))]
+pub struct Error {
+    id: String,
+    #[source]
+    #[diagnostic_source]
+    #[diagnostic(transparent)]
+    source: InvalidAttributeError,
+}
+
+#[derive(Debug, Error, Diagnostic)]
 pub enum InvalidAttributeError {
     #[error("Both union and type cannot be present")]
+    #[diagnostic(help(
+        "In Aidbox union takes the effect. To avoid ambiguity during conversion, leave only one."
+    ))]
     InvalidKind,
 
-    #[error("JSON Schema is not supported")]
+    #[error("schema field is present. JSON Schema is not supported")]
+    #[diagnostic(help(
+        "{} {}\n{}",
+        "schema field is a JSON Schema for validating the property.",
+        "This converter does not JSON Schema.",
+        "Consider writing corresponding StructureDefinition manually."
+    ))]
     SchemaPresent,
 
-    #[error("isSummary is not supported")]
+    #[error("Unsupported property: isSummary")]
+    #[diagnostic(help(
+        "{}\n{}",
+        "isSummary makes element appear in _summary. Only FHIR itself can mark elements as summaryr.",
+        "Consider removing it to conform with the FHIR spec."
+    ))]
     SummaryPresent,
 
-    #[error("isModifier is not supported")]
+    #[error("Unsupported property: isModifier")]
+    #[diagnostic(help(
+        "{} {}\n{}",
+        "isModifier marks modifier element or modifier extension.",
+        "There are some additional restrictions from FHIR, so the converter does not support them.",
+        "Consider removing isModifier from Attributes and adding to generated StructureDefintion resources manually."
+    ))]
     ModifierPresent,
 
-    #[error("isUnique is not supported")]
+    #[error("Unsupported property: isUnique")]
+    #[diagnostic(help(
+        "{} {}\n{}",
+        "isUnique provides automatic validation of some kind of uniqueness across all resources in database.",
+        "This validation is not supported in FHIR Schema mode.",
+        "Construct equivalent unique index in database and remove the isUnique on the Attribute."
+    ))]
     UniquePresent,
 
-    #[error("order is not supported")]
+    #[error("Unsupported property: order")]
+    #[diagnostic(help(
+        "{} {}\n{}",
+        "The order property in Aidbox Attribute reflects the ElementDefinition position in the differential.",
+        "This converter does not support order or ordered slices, and ignoring it is probably safe.",
+        "But you should consider removing it."
+    ))]
     OrderPresent,
 
-    #[error("Invalid entity reference: {0:?}")]
+    #[error("Invalid type reference resourceType: expected Entity, found {}", .0.resource_type)]
+    #[diagnostic(help(
+        "{} {}",
+        "In valid Aidbox Attribute type is either reference to Entity, or to Attribute.",
+        "Reference to Attribute is used to describe recursive structure, which is not supported by this converter",
+    ))]
     InvalidEntityReference(aidbox::Reference),
 
-    #[error("Invalid ValueSet reference: {0:?}")]
+    #[error("Invalid ValueSet reference resourceType: expected ValueSet, found {}", .0.resource_type)]
+    #[diagnostic(help("Check ValueSet reference."))]
     InvalidValuesetReference(aidbox::Reference),
 
     #[error("Invalid concrete attribute")]
@@ -73,7 +125,7 @@ pub enum InvalidAttributeError {
     InvalidPolymorphic(#[from] InvalidPolymorphic),
 
     #[error("Invalid complex attribute")]
-    InvalidComples(#[from] InvalidComplex),
+    InvalidComplex(#[from] InvalidComplex),
 }
 
 #[derive(Debug, Clone, Error)]
@@ -389,8 +441,10 @@ impl Attribute {
         (attr, errors)
     }
 
-    pub fn build_from(attr: aidbox::Attribute) -> (Option<Self>, Vec<InvalidAttributeError>) {
+    pub fn build_from(attr: aidbox::Attribute) -> (Option<Self>, Vec<Error>) {
         let mut errors: Vec<InvalidAttributeError> = Self::check_unsupported_properties(&attr);
+
+        let id = attr.id.clone();
 
         let (typed_attr, mut read_errors) = match (&attr.r#type, &attr.union) {
             (Some(_), None) => Self::read_target_attribute(attr),
@@ -400,6 +454,14 @@ impl Attribute {
         };
 
         errors.append(&mut read_errors);
+
+        let errors = errors
+            .into_iter()
+            .map(|error| Error {
+                id: id.clone(),
+                source: error,
+            })
+            .collect();
 
         (typed_attr, errors)
     }

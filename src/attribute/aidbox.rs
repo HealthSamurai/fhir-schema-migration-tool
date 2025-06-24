@@ -1,11 +1,13 @@
 use std::io::Read;
 
+use miette::Diagnostic;
 use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 /// Entity attribute metadata
 pub struct Attribute {
     /// Attribute id as stored in the database
@@ -67,9 +69,11 @@ pub struct Attribute {
 
     /// If this is a reference, which targets are allowed
     pub refers: Option<Vec<String>>,
+
+    pub resource_type: Option<String>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum Error {
     #[error("Could not parse Attribute resource as JSON (malformed JSON or invalid resource)")]
     InvalidJson(#[from] serde_json::Error),

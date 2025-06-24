@@ -1,0 +1,12 @@
+id: Test.badValueSet
+path:
+  - badValueSet
+resource:
+  id: Test
+  resourceType: Entity
+type:
+  id: string
+  resourceType: Entity
+valueSet:
+  id: vs
+  resourceType: NotValueSet

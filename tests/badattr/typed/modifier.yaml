@@ -1,0 +1,7 @@
+id: Test.modifier
+path:
+  - modifier
+resource:
+  id: Test
+  resourceType: Entity
+isModifier: true

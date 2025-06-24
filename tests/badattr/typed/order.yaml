@@ -1,0 +1,7 @@
+id: Test.order
+path:
+  - order
+resource:
+  id: Test
+  resourceType: Entity
+order: 1

@@ -1,0 +1,7 @@
+id: Test.schema
+path:
+  - schema
+resource:
+  id: Test
+  resourceType: Entity
+schema: some json schema

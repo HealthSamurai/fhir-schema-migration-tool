@@ -2,12 +2,14 @@ pub mod attribute;
 pub mod paths;
 pub mod trie;
 
+use miette::{Diagnostic, miette};
 use std::{
     io::BufReader,
     path::{Path, PathBuf},
 };
 
 use clap::Parser;
+use thiserror::Error;
 use walkdir::WalkDir;
 
 /// Generate structure definition from Aidbox attributes
@@ -38,12 +40,50 @@ fn is_json_or_yaml(path: &Path) -> bool {
     is_json(path) || is_yaml(path)
 }
 
+#[derive(Debug, Error, Diagnostic)]
+enum Error {
+    #[error("Error while searching for JSON and YAML files in {base_path}")]
+    #[diagnostic(code(E001))]
+    #[diagnostic(help("Ensure the directory name is correct and you have access rights"))]
+    WalkError {
+        base_path: PathBuf,
+        #[source]
+        source: walkdir::Error,
+    },
+
+    #[error("Could not read contents of the file {filename}")]
+    #[diagnostic(code(E002))]
+    ReadFile {
+        filename: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("Could not read {filename} as Aidbox attribute")]
+    #[diagnostic(code(E003))]
+    BadAttribute {
+        filename: PathBuf,
+        #[source]
+        source: attribute::aidbox::Error,
+    },
+}
+
 fn main() -> Result<(), String> {
+    _ = miette::set_hook(Box::new(|_| {
+        Box::new(
+            miette::MietteHandlerOpts::new()
+                .break_words(true)
+                .width(120)
+                .with_cause_chain()
+                .build(),
+        )
+    }));
+
     let mut had_errors = false;
     let args = Args::parse();
     let path = args.path;
 
-    let walker = WalkDir::new(path).into_iter();
+    let walker = WalkDir::new(&path).into_iter();
 
     let mut aidbox_attributes: Vec<attribute::aidbox::Attribute> = Vec::new();
 
@@ -51,7 +91,14 @@ fn main() -> Result<(), String> {
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
-                eprintln!("{}", error);
+                had_errors = true;
+                eprintln!(
+                    "Error: {:?}",
+                    miette::Report::new(Error::WalkError {
+                        base_path: path.clone(),
+                        source: error
+                    })
+                );
                 continue;
             }
         };
@@ -64,7 +111,13 @@ fn main() -> Result<(), String> {
             Ok(file) => file,
             Err(error) => {
                 had_errors = true;
-                eprintln!("{}", error);
+                eprintln!(
+                    "Error: {:?}",
+                    miette::Report::new(Error::ReadFile {
+                        filename: path.to_owned(),
+                        source: error
+                    })
+                );
                 continue;
             }
         };
@@ -78,7 +131,14 @@ fn main() -> Result<(), String> {
         let aidbox_attribute = match aidbox_attribute {
             Ok(attribute) => attribute,
             Err(error) => {
-                eprintln!("{}", error);
+                had_errors = true;
+                eprintln!(
+                    "Error: {:?}",
+                    miette::Report::new(Error::BadAttribute {
+                        filename: path.to_owned(),
+                        source: error
+                    })
+                );
                 continue;
             }
         };
@@ -93,6 +153,10 @@ fn main() -> Result<(), String> {
 
         if !errors.is_empty() {
             had_errors = true;
+        }
+
+        for error in errors {
+            eprintln!("Error: {:?}", miette::Report::new(error))
         }
 
         let Some(typed_attribute) = typed_attribute else {
@@ -118,7 +182,7 @@ fn main() -> Result<(), String> {
         had_errors = true;
     }
     for error in errors {
-        eprintln!("{}", error);
+        eprintln!("Error: {:?}", miette::Report::new(error))
     }
 
     let (inverted_forest, errors) = trie::inverted::Forest::build_from(extension_separated_forest);
