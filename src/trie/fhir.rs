@@ -4,6 +4,7 @@ use thiserror::Error;
 use crate::trie::inverted;
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ElementDefinition {
     pub id: String,
     pub path: String,
@@ -42,7 +43,8 @@ pub struct Binding {
 #[serde(rename_all = "camelCase")]
 pub struct ElementType {
     pub code: String,
-    pub target_profile: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_profile: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]

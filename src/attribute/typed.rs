@@ -45,13 +45,12 @@ pub struct AttributeKindComplex {
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("Attribute {id} is invalid")]
-#[diagnostic(code(E004))]
 pub struct Error {
-    id: String,
+    pub id: String,
     #[source]
     #[diagnostic_source]
     #[diagnostic(transparent)]
-    source: InvalidAttributeError,
+    pub source: InvalidAttributeError,
 }
 
 #[derive(Debug, Error, Diagnostic)]
@@ -118,46 +117,68 @@ pub enum InvalidAttributeError {
     #[diagnostic(help("Check ValueSet reference."))]
     InvalidValuesetReference(aidbox::Reference),
 
-    #[error("Invalid concrete attribute")]
+    #[error("Invalid concrete attribute.")]
     InvalidConcrete(#[from] InvalidConcrete),
 
-    #[error("Invalid polymorphic attribute")]
+    #[error("Invalid polymorphic attribute.")]
     InvalidPolymorphic(#[from] InvalidPolymorphic),
 
-    #[error("Invalid complex attribute")]
+    #[error("Invalid complex attribute.")]
     InvalidComplex(#[from] InvalidComplex),
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum InvalidPolymorphic {
-    #[error("ValueSet binding on polymorphic is not allowed")]
+    #[error("ValueSet binding on polymorphic root is not allowed")]
+    #[diagnostic(help(
+        "{}\n{}",
+        "It is allowed by FHIR spec, but Aidbox Attribute validator doesn't support it, so the converter rejects such cases.",
+        "Consider removing binding or moving it to polymorphic targets."
+    ))]
     ValueSetPresent,
 
     #[error("isOpen on polymorhic is not allowed")]
+    #[diagnostic(help(
+        "It is not clear how to map isOpen to correct FHIR extensions. Contact us to come up with solution."
+    ))]
     OpenSchema,
 
     #[error("enum on polymorphic is not allowed")]
+    #[diagnostic(help(
+        "{} {}",
+        "Aidbox attribute validator doesn't interpret enum on polymorphic root attribute.",
+        "To avoid ambiguites the converter considers it an error."
+    ))]
     EnumPresent,
 
     #[error("Reference target binding on polymorhpic is not allowed")]
+    #[diagnostic(help(
+        "Reference target should be placed on concrete polymorphic choice attribute."
+    ))]
     RefersPresent,
 
     #[error("Empty list of targets")]
+    #[diagnostic(help(
+        "Polymorphic element without any targets could not be present in a resource."
+    ))]
     NoTargets,
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum InvalidConcrete {
     #[error("ValueSet binding declared on type not supporting bindings: {0}")]
+    #[diagnostic(help(
+        "ValueSet binding can be only on coded types. Refer to the FHIR specification to get a list of all coded data types."
+    ))]
     ValueSetOnWrongType(String),
 
     #[error("Reference target binding on non-reference type: {0}")]
     RefersOnNonReferenceType(String),
 
-    #[error("Enum specified on non-string-type: {0}")]
+    #[error("enum specified on non-string-type: {0}")]
     EnumOnNonStirngType(String),
 
-    #[error("isOpen is not allowed on target Attributes")]
+    #[error("isOpen is not allowed on concrete Attribute resources")]
     OpenSchema,
 }
 
@@ -166,10 +187,10 @@ pub enum InvalidComplex {
     #[error("ValueSet binding is not allowed on complex attributes")]
     ValueSetPresent,
 
-    #[error("Enum is not allowed on complex attributes")]
+    #[error("enum is not allowed on complex attributes")]
     EnumPresent,
 
-    #[error("Refers is not allowed on complex attributes")]
+    #[error("refers is not allowed on complex attributes")]
     RefersPresent,
 }
 
@@ -231,22 +252,52 @@ impl Attribute {
         errors
     }
 
-    fn parse_target(target: &aidbox::Reference) -> Result<String, InvalidAttributeError> {
+    fn parse_resource_type(
+        target: &aidbox::Reference,
+    ) -> (Option<String>, Option<InvalidAttributeError>) {
         if target.resource_type != "Entity" {
-            return Err(InvalidAttributeError::InvalidEntityReference(
-                target.to_owned(),
-            ));
+            return (
+                Some(target.id.to_owned()),
+                Some(InvalidAttributeError::InvalidEntityReference(
+                    target.to_owned(),
+                )),
+            );
         }
-        Ok(target.id.to_owned())
+
+        (Some(target.id.to_owned()), None)
     }
 
-    fn parse_value_set(value_set: &aidbox::Reference) -> Result<String, InvalidAttributeError> {
-        if value_set.resource_type != "ValueSet" {
-            return Err(InvalidAttributeError::InvalidValuesetReference(
-                value_set.to_owned(),
-            ));
+    fn parse_type(target: &aidbox::Reference) -> (Option<String>, Option<InvalidAttributeError>) {
+        if target.resource_type == "Attribute" {
+            return (
+                None,
+                Some(InvalidAttributeError::InvalidEntityReference(
+                    target.to_owned(),
+                )),
+            );
         }
-        Ok(value_set.id.to_owned())
+
+        if target.resource_type != "Entity" {
+            return (
+                Some(target.id.to_owned()),
+                Some(InvalidAttributeError::InvalidEntityReference(
+                    target.to_owned(),
+                )),
+            );
+        }
+
+        (Some(target.id.to_owned()), None)
+    }
+
+    fn parse_value_set(value_set: &aidbox::Reference) -> (String, Option<InvalidAttributeError>) {
+        let error = if value_set.resource_type != "ValueSet" {
+            Some(InvalidAttributeError::InvalidValuesetReference(
+                value_set.to_owned(),
+            ))
+        } else {
+            None
+        };
+        (value_set.id.to_owned(), error)
     }
 
     pub fn read_target_attribute(
@@ -260,67 +311,67 @@ impl Attribute {
         // Already checked that not None
         let attr_type = attr.r#type.as_ref().unwrap();
 
-        let resource_type = match Self::parse_target(&attr.resource) {
-            Ok(rt) => Some(rt),
-            Err(e) => {
-                errors.push(e);
-                None
-            }
-        };
+        let (resource_type, rt_error) = Self::parse_resource_type(&attr.resource);
+        if let Some(rt_error) = rt_error {
+            errors.push(rt_error);
+        }
 
         if attr.is_open.is_some_and(|x| x) {
             errors.push(InvalidConcrete::OpenSchema.into());
         }
 
         let mut value_set: Option<String> = None;
-        if let Some(value_set_ref) = &attr.value_set {
-            match Self::parse_value_set(value_set_ref) {
-                Ok(vs) => value_set = Some(vs),
-                Err(e) => errors.push(e),
+        let value_set = if let Some(value_set_ref) = &attr.value_set {
+            let (value_set, error) = Self::parse_value_set(value_set_ref);
+            if let Some(error) = error {
+                errors.push(error);
             }
+            Some(value_set)
+        } else {
+            None
         };
         let value_set = value_set;
 
-        match Self::parse_target(attr_type) {
-            Ok(target) => {
-                if value_set.is_some() && !CODED_TYPES.contains(&target.as_str()) {
-                    errors.push(InvalidConcrete::ValueSetOnWrongType(target.clone()).into());
-                }
-
-                if attr.r#enum.is_some() && !STRING_TYPES.contains(&target.as_str()) {
-                    errors.push(InvalidConcrete::EnumOnNonStirngType(target.clone()).into());
-                }
-
-                if attr.refers.is_some() && target != "Reference" {
-                    errors.push(InvalidConcrete::RefersOnNonReferenceType(target.clone()).into());
-                }
-
-                let Some(resource_type) = resource_type else {
-                    return (None, errors);
-                };
-
-                let kind = AttributeKind::Concrete(AttributeKindConcrete {
-                    target,
-                    value_set,
-                    refers: attr.refers.to_owned(),
-                });
-
-                let attr = Some(Attribute {
-                    id: attr.id,
-                    path: attr.path,
-                    resource_type,
-                    kind,
-                    array: attr.is_collection.is_some_and(|x| x),
-                    required: attr.is_required.is_some_and(|x| x),
-                    fce: attr.extension_url.to_owned(),
-                });
-
-                (attr, errors)
+        let (target, error) = Self::parse_type(attr_type);
+        if let Some(error) = error {
+            errors.push(error);
+        }
+        if let Some(target) = target {
+            if value_set.is_some() && !CODED_TYPES.contains(&target.as_str()) {
+                errors.push(InvalidConcrete::ValueSetOnWrongType(target.clone()).into());
             }
-            Err(e) => {
-                errors.push(e);
-                (None, errors)
+
+            if attr.r#enum.is_some() && !STRING_TYPES.contains(&target.as_str()) {
+                errors.push(InvalidConcrete::EnumOnNonStirngType(target.clone()).into());
             }
+
+            if attr.refers.is_some() && target != "Reference" {
+                errors.push(InvalidConcrete::RefersOnNonReferenceType(target.clone()).into());
+            }
+
+            let Some(resource_type) = resource_type else {
+                return (None, errors);
+            };
+
+            let kind = AttributeKind::Concrete(AttributeKindConcrete {
+                target,
+                value_set,
+                refers: attr.refers.to_owned(),
+            });
+
+            let attr = Some(Attribute {
+                id: attr.id,
+                path: attr.path,
+                resource_type,
+                kind,
+                array: attr.is_collection.is_some_and(|x| x),
+                required: attr.is_required.is_some_and(|x| x),
+                fce: attr.extension_url.to_owned(),
+            });
+
+            (attr, errors)
+        } else {
+            (None, errors)
         }
     }
 
@@ -335,13 +386,10 @@ impl Attribute {
         // Already checked that not None
         let attr_types = attr.union.as_ref().unwrap();
 
-        let resource_type = match Self::parse_target(&attr.resource) {
-            Ok(rt) => Some(rt),
-            Err(e) => {
-                errors.push(e);
-                None
-            }
-        };
+        let (resource_type, error) = Self::parse_resource_type(&attr.resource);
+        if let Some(error) = error {
+            errors.push(error);
+        }
 
         if attr.is_open.is_some_and(|x| x) {
             errors.push(InvalidPolymorphic::OpenSchema.into());
@@ -365,9 +413,12 @@ impl Attribute {
 
         let mut targets: Vec<String> = Vec::new();
         for target_ref in attr_types {
-            match Self::parse_target(target_ref) {
-                Ok(target) => targets.push(target),
-                Err(e) => errors.push(e),
+            let (target, error) = Self::parse_type(target_ref);
+            if let Some(error) = error {
+                errors.push(error);
+            }
+            if let Some(target) = target {
+                targets.push(target);
             }
         }
         let targets = targets;
@@ -402,13 +453,10 @@ impl Attribute {
 
         let mut errors: Vec<InvalidAttributeError> = Vec::new();
 
-        let resource_type = match Self::parse_target(&attr.resource) {
-            Ok(rt) => Some(rt),
-            Err(e) => {
-                errors.push(e);
-                None
-            }
-        };
+        let (resource_type, error) = Self::parse_resource_type(&attr.resource);
+        if let Some(error) = error {
+            errors.push(error);
+        }
 
         if attr.value_set.is_some() {
             errors.push(InvalidComplex::ValueSetPresent.into());

@@ -139,6 +139,12 @@ impl Trie {
 }
 
 impl Node {
+    pub fn get_id(&self) -> Option<&str> {
+        match &self {
+            Node::Normal(normal_node) => normal_node.get_id(),
+            Node::Extension(extension) => Some(extension.get_id()),
+        }
+    }
     pub fn build_from(source_node: raw::Node) -> Self {
         let children: BTreeMap<String, Node> = source_node
             .children
@@ -228,6 +234,14 @@ impl Node {
 }
 
 impl Extension {
+    pub fn get_id(&self) -> &str {
+        match &self {
+            Extension::Concrete(extension) => &extension.id,
+            Extension::Polymorphic(extension) => &extension.id,
+            Extension::Complex(extension) => &extension.id,
+        }
+    }
+
     pub fn convert_to_normal_node(self) -> NormalNode {
         match self {
             Extension::Concrete(concrete_extension) => NormalNode::Concrete(ConcreteNode {

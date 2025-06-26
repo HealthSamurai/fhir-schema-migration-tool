@@ -6,6 +6,7 @@ use miette::{Diagnostic, miette};
 use std::{
     io::BufReader,
     path::{Path, PathBuf},
+    process,
 };
 
 use clap::Parser;
@@ -22,6 +23,10 @@ struct Args {
     /// Try to generate StructureDefinition resources even if there were errors
     #[arg(long)]
     ignore_errors: bool,
+
+    /// Ignore errors related to isSummary, isModifier, order flags
+    #[arg(long)]
+    ignore_flags: bool,
 }
 
 fn is_json(path: &Path) -> bool {
@@ -43,7 +48,6 @@ fn is_json_or_yaml(path: &Path) -> bool {
 #[derive(Debug, Error, Diagnostic)]
 enum Error {
     #[error("Error while searching for JSON and YAML files in {base_path}")]
-    #[diagnostic(code(E001))]
     #[diagnostic(help("Ensure the directory name is correct and you have access rights"))]
     WalkError {
         base_path: PathBuf,
@@ -52,7 +56,6 @@ enum Error {
     },
 
     #[error("Could not read contents of the file {filename}")]
-    #[diagnostic(code(E002))]
     ReadFile {
         filename: PathBuf,
         #[source]
@@ -60,7 +63,6 @@ enum Error {
     },
 
     #[error("Could not read {filename} as Aidbox attribute")]
-    #[diagnostic(code(E003))]
     BadAttribute {
         filename: PathBuf,
         #[source]
@@ -68,7 +70,7 @@ enum Error {
     },
 }
 
-fn main() -> Result<(), String> {
+fn main() {
     _ = miette::set_hook(Box::new(|_| {
         Box::new(
             miette::MietteHandlerOpts::new()
@@ -93,7 +95,7 @@ fn main() -> Result<(), String> {
             Err(error) => {
                 had_errors = true;
                 eprintln!(
-                    "Error: {:?}",
+                    "{:?}",
                     miette::Report::new(Error::WalkError {
                         base_path: path.clone(),
                         source: error
@@ -112,7 +114,7 @@ fn main() -> Result<(), String> {
             Err(error) => {
                 had_errors = true;
                 eprintln!(
-                    "Error: {:?}",
+                    "{:?}",
                     miette::Report::new(Error::ReadFile {
                         filename: path.to_owned(),
                         source: error
@@ -133,7 +135,7 @@ fn main() -> Result<(), String> {
             Err(error) => {
                 had_errors = true;
                 eprintln!(
-                    "Error: {:?}",
+                    "{:?}",
                     miette::Report::new(Error::BadAttribute {
                         filename: path.to_owned(),
                         source: error
@@ -151,12 +153,28 @@ fn main() -> Result<(), String> {
     for aidbox_attribute in aidbox_attributes {
         let (typed_attribute, errors) = attribute::typed::Attribute::build_from(aidbox_attribute);
 
+        let errors = if args.ignore_flags {
+            errors
+                .into_iter()
+                .filter(|error| {
+                    !matches!(
+                        error.source,
+                        attribute::typed::InvalidAttributeError::SummaryPresent
+                            | attribute::typed::InvalidAttributeError::ModifierPresent
+                            | attribute::typed::InvalidAttributeError::OrderPresent
+                    )
+                })
+                .collect()
+        } else {
+            errors
+        };
+
         if !errors.is_empty() {
             had_errors = true;
         }
 
         for error in errors {
-            eprintln!("Error: {:?}", miette::Report::new(error))
+            eprintln!("{:?}", miette::Report::new(error))
         }
 
         let Some(typed_attribute) = typed_attribute else {
@@ -182,7 +200,7 @@ fn main() -> Result<(), String> {
         had_errors = true;
     }
     for error in errors {
-        eprintln!("Error: {:?}", miette::Report::new(error))
+        eprintln!("{:?}", miette::Report::new(error))
     }
 
     let (inverted_forest, errors) = trie::inverted::Forest::build_from(extension_separated_forest);
@@ -209,8 +227,6 @@ fn main() -> Result<(), String> {
     }
 
     if had_errors {
-        Err("Error".to_owned())
-    } else {
-        Ok(())
+        process::exit(1);
     }
 }

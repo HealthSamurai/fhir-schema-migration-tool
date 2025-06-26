@@ -114,37 +114,59 @@ pub struct InferredNode {
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum Error {
-    #[error("Todo")]
-    Todo,
-
-    #[error("Concrete element has child")]
-    ConcreteHasChild,
-
-    #[error("Polymorphic has child with extension")]
-    PolymorphicChildExtension,
-
-    #[error("Polymorphic has non-concrete child")]
-    PolymorphicNonConcreteChild,
-
-    #[error("Root is extension")]
-    RootIsExtension,
+    #[error(
+        "Attribute {node_id} defines a concrete element. Concrete elements must not have children, but this element has."
+    )]
+    ConcreteHasChild { node_id: String },
 
     #[error(
-        "Extension defined by Attribute {parent_id} must have only extension children. But found non-extension child {child_id}"
+        "Attribute {attr_id} defines a polymorphic elements. It has child {child_id} with extensionUrl set. Children of polymorphic elements must not have extensionUrl."
     )]
+    #[diagnostic(help(
+        "This leads to invalid conversion Aidbox->FHIR format. Aidbox->FHIR converter represents this situation as valueExtension field, which is impossible in FHIR."
+    ))]
+    PolymorphicChildExtension { attr_id: String, child_id: String },
+
+    #[error(
+        "Attribute {attr_id} defines a polymorphic element. It has child {child_id} which is not a concrete element (i.e. does not have type set). Every child of a polymorphic must be a concrete element."
+    )]
+    PolymorphicNonConcreteChild { attr_id: String, child_id: String },
+
+    #[error(
+        "Attribute {attr_id} defines a polymorphic element. It has an inferred complex child under {child_prop} property. Polymorphic elements must only have concrete, explicity children."
+    )]
+    PolymorphicInferredChild { attr_id: String, child_prop: String },
+
+    #[error(
+        "Attribute {attr_id} is a root attribute (empty path) and it has extensionUrl set. Root cannot be an extension."
+    )]
+    RootIsExtension { attr_id: String },
+
+    #[error(
+        "Attribute {parent_id} defines an extension. Its children must be extensions, but child {child_id} is not an extension."
+    )]
+    #[diagnostic(help("Consider assigning extensionUrl to the {child_id} attribute."))]
     NonExtensionInsideExtension { parent_id: String, child_id: String },
 
-    #[error("Missing attribute for child in extension.")]
+    #[error(
+        "{} {}",
+        "Attribute {parent_id} defines an extension.",
+        format!("Its children must be explicitly specified, but child {child_property} has no corresponding attribute.")
+    )]
     MissingChild {
         parent_id: String,
         child_property: String,
     },
 
-    #[error("Polymorphic target can not set isArray")]
-    PolymorphicChildHasArray,
+    #[error(
+        "Attribute {attr_id} is a child of a polymorphic Attribute. Such attributes must not set isArray (it is controlled at the polymorphic root level)."
+    )]
+    PolymorphicChildHasArray { attr_id: String },
 
-    #[error("Polymorphic target can not set isRequired")]
-    PolymorphicChildIsRequired,
+    #[error(
+        "Attribute {attr_id} is a child of a polymorphic Attribute. Such attributes must not set isRequired (it is controlled at the polymorphic root level)."
+    )]
+    PolymorphicChildIsRequired { attr_id: String },
 }
 
 impl Default for Forest {
@@ -180,7 +202,9 @@ impl Trie {
         let (root, errors) = match source_trie.root {
             path::Node::Normal(normal_node) => NormalNode::build_from(normal_node),
             path::Node::Extension(extension) => {
-                errors.push(Error::RootIsExtension);
+                errors.push(Error::RootIsExtension {
+                    attr_id: extension.get_id().to_owned(),
+                });
                 NormalNode::build_from(extension.convert_to_normal_node())
             }
         };
@@ -252,7 +276,9 @@ impl ConcreteNode {
     pub fn build_from(source_node: path::ConcreteNode) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         if !source_node.children.is_empty() {
-            errors.push(Error::ConcreteHasChild);
+            errors.push(Error::ConcreteHasChild {
+                node_id: source_node.id.clone(),
+            });
         }
 
         let node = Self {
@@ -271,7 +297,9 @@ impl ConcreteNode {
     pub fn build_from_extension(source_node: path::ConcreteExtension) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         if !source_node.children.is_empty() {
-            errors.push(Error::ConcreteHasChild);
+            errors.push(Error::ConcreteHasChild {
+                node_id: source_node.id.to_owned(),
+            });
         }
 
         let node = Self {
@@ -292,7 +320,9 @@ impl ConcreteExtension {
     pub fn build_from(source_node: path::ConcreteExtension) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         if !source_node.children.is_empty() {
-            errors.push(Error::ConcreteHasChild);
+            errors.push(Error::ConcreteHasChild {
+                node_id: source_node.id.to_owned(),
+            });
         }
 
         let node = Self {
@@ -314,11 +344,15 @@ impl PolymorphicLeaf {
     pub fn build_from(source_node: path::ConcreteNode) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         if source_node.array {
-            errors.push(Error::PolymorphicChildHasArray)
+            errors.push(Error::PolymorphicChildHasArray {
+                attr_id: source_node.id.clone(),
+            })
         }
 
         if source_node.required {
-            errors.push(Error::PolymorphicChildIsRequired)
+            errors.push(Error::PolymorphicChildIsRequired {
+                attr_id: source_node.id.clone(),
+            })
         }
 
         let node = Self {
@@ -335,11 +369,15 @@ impl PolymorphicLeaf {
     pub fn build_from_extension(source_node: path::ConcreteExtension) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         if source_node.array {
-            errors.push(Error::PolymorphicChildHasArray)
+            errors.push(Error::PolymorphicChildHasArray {
+                attr_id: source_node.id.clone(),
+            })
         }
 
         if source_node.required {
-            errors.push(Error::PolymorphicChildIsRequired)
+            errors.push(Error::PolymorphicChildIsRequired {
+                attr_id: source_node.id.clone(),
+            })
         }
 
         let node = Self {
@@ -367,13 +405,29 @@ impl PolymorphicNode {
                     children.insert(name, node);
                 }
                 path::Node::Extension(path::Extension::Concrete(source_child)) => {
-                    errors.push(Error::PolymorphicChildExtension);
+                    errors.push(Error::PolymorphicChildExtension {
+                        attr_id: source_node.id.clone(),
+                        child_id: source_child.id.clone(),
+                    });
                     let (node, mut build_errors) =
                         PolymorphicLeaf::build_from_extension(source_child);
                     errors.append(&mut build_errors);
                     children.insert(name, node);
                 }
-                _ => errors.push(Error::PolymorphicNonConcreteChild),
+                node => {
+                    let child_id = node.get_id();
+                    if let Some(child_id) = child_id {
+                        errors.push(Error::PolymorphicNonConcreteChild {
+                            attr_id: source_node.id.clone(),
+                            child_id: child_id.to_owned(),
+                        })
+                    } else {
+                        errors.push(Error::PolymorphicInferredChild {
+                            attr_id: source_node.id.clone(),
+                            child_prop: name,
+                        })
+                    }
+                }
             };
         }
 
@@ -404,13 +458,29 @@ impl PolymorphicExtension {
                     children.insert(name, node);
                 }
                 path::Node::Extension(path::Extension::Concrete(source_child)) => {
-                    errors.push(Error::PolymorphicChildExtension);
+                    errors.push(Error::PolymorphicChildExtension {
+                        attr_id: source_node.id.clone(),
+                        child_id: source_child.id.clone(),
+                    });
                     let (node, mut build_errors) =
                         PolymorphicLeaf::build_from_extension(source_child);
                     errors.append(&mut build_errors);
                     children.insert(name, node);
                 }
-                _ => errors.push(Error::PolymorphicNonConcreteChild),
+                child => {
+                    let child_id = child.get_id();
+                    if let Some(child_id) = child_id {
+                        errors.push(Error::PolymorphicNonConcreteChild {
+                            attr_id: source_node.id.clone(),
+                            child_id: child_id.to_owned(),
+                        })
+                    } else {
+                        errors.push(Error::PolymorphicInferredChild {
+                            attr_id: source_node.id.clone(),
+                            child_prop: name,
+                        })
+                    }
+                }
             };
         }
 

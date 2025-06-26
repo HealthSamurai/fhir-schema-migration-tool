@@ -99,17 +99,11 @@ pub struct ComplexExtension {
 
 #[derive(Debug, Clone, Error)]
 pub enum Error {
-    #[error("Todo")]
-    Todo,
-
     #[error("Polymorphic has undeclared target")]
-    PolymorphicUndeclaredTarget,
+    PolymorphicUndeclaredTarget { attr_id: String, target: String },
 
-    #[error("Polymorphic does not have a child correspondind to some union member")]
-    PolymorphicNoTargetChild,
-
-    #[error("Duplicate extension url")]
-    DuplicateExtensionUrl,
+    #[error("Duplicate extension url {url}")]
+    DuplicateExtensionUrl { url: String },
 }
 
 impl Default for Forest {
@@ -232,7 +226,7 @@ impl ComplexNode {
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
             if extension.contains_key(&url) {
-                errors.push(Error::DuplicateExtensionUrl)
+                errors.push(Error::DuplicateExtensionUrl { url: url.clone() })
             } else {
                 extension.insert(url, node);
             }
@@ -267,7 +261,7 @@ impl InferredNode {
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
             if extension.contains_key(&url) {
-                errors.push(Error::DuplicateExtensionUrl)
+                errors.push(Error::DuplicateExtensionUrl { url })
             } else {
                 extension.insert(url, node);
             }
@@ -340,7 +334,10 @@ impl SimpleExtension {
             HashSet::from_iter(source_node.targets.iter().cloned());
         for (name, target) in source_node.children {
             if !declared_targets.contains(&name) {
-                errors.push(Error::PolymorphicUndeclaredTarget)
+                errors.push(Error::PolymorphicUndeclaredTarget {
+                    attr_id: source_node.id.clone(),
+                    target: name.clone(),
+                })
             };
             let target = ExtensionTarget {
                 id: target.id,
@@ -375,7 +372,7 @@ impl ComplexExtension {
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
             if extension.contains_key(&url) {
-                errors.push(Error::DuplicateExtensionUrl)
+                errors.push(Error::DuplicateExtensionUrl { url })
             } else {
                 extension.insert(url, node);
             }
