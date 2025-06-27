@@ -277,6 +277,27 @@ impl InferredNode {
 }
 
 impl Extension {
+    pub fn get_fce_property(&self) -> &str {
+        match &self {
+            Extension::Simple(simple_extension) => &simple_extension.fce_property,
+            Extension::Complex(complex_extension) => &complex_extension.fce_property,
+        }
+    }
+
+    pub fn is_required(&self) -> bool {
+        match &self {
+            Extension::Simple(simple_extension) => simple_extension.required,
+            Extension::Complex(complex_extension) => complex_extension.required,
+        }
+    }
+
+    pub fn is_array(&self) -> bool {
+        match &self {
+            Extension::Simple(simple_extension) => simple_extension.array,
+            Extension::Complex(complex_extension) => complex_extension.array,
+        }
+    }
+
     pub fn build_from(
         source_node: extension_separated::Extension,
         fce_property: String,

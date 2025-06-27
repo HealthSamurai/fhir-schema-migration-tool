@@ -211,6 +211,8 @@ fn main() {
         eprintln!("{}", error);
     }
 
+    let profiles = trie::fhir::make_profiles(&inverted_forest);
+
     let (exts, errors) = trie::fhir::collect_extensions(inverted_forest);
 
     if !errors.is_empty() {
@@ -223,6 +225,9 @@ fn main() {
     if !had_errors || args.ignore_errors {
         for ext in exts {
             println!("{}", serde_json::to_string_pretty(&ext).unwrap());
+        }
+        for profile in profiles {
+            println!("{}", serde_json::to_string_pretty(&profile).unwrap());
         }
     }
 

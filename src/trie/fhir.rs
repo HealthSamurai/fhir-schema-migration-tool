@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::trie::inverted;
+use crate::trie::inverted::{self, NormalNode};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +47,8 @@ pub struct ElementType {
     pub code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_profile: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -61,7 +65,8 @@ pub struct StructureDefinition {
     pub url: String,
     pub name: String,
     pub derivation: String,
-    pub context: Vec<StructureDefinitionContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<Vec<StructureDefinitionContext>>,
     pub differential: StructureDefinitionDifferential,
     pub kind: String,
     pub r#type: String,
@@ -175,14 +180,14 @@ pub fn emit_extension(
         },
         name: name,
         derivation: "constraint".to_owned(),
-        context: vec![StructureDefinitionContext {
+        context: Some(vec![StructureDefinitionContext {
             r#type: "element".to_owned(),
             expression: path.iter().fold(rt.to_owned(), |mut acc, component| {
                 acc.push('.');
                 acc.push_str(component);
                 acc
             }),
-        }],
+        }]),
         kind: "complex-type".to_owned(),
         r#type: "Extension".to_owned(),
     }
@@ -234,6 +239,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                         .iter()
                         .map(|(target_type, target_info)| ElementType {
                             code: target_type.to_owned(),
+                            profile: None,
                             target_profile: target_info.refers.as_ref().map(|refs| {
                                 refs.into_iter()
                                     .map(|tref| format!("http://hl7.org/fhir/{}", tref))
@@ -406,6 +412,7 @@ pub fn emit_nested(
                         .iter()
                         .map(|(target_type, target_info)| ElementType {
                             code: target_type.to_owned(),
+                            profile: None,
                             target_profile: target_info.refers.as_ref().map(|refs| {
                                 refs.iter()
                                     .map(|tref| format!("http://hl7.org/fhir/{}", tref))
@@ -531,4 +538,105 @@ pub fn emit_nested(
             res
         }
     }
+}
+
+pub fn make_profiles(forest: &inverted::Forest) -> Vec<StructureDefinition> {
+    let mut result: Vec<StructureDefinition> = Vec::new();
+    for (rt, trie) in &forest.forest {
+        let node = &trie.root;
+        let profile = make_profile_for(rt, node);
+        result.push(profile);
+    }
+
+    result
+}
+
+pub fn make_profile_for(rt: &str, node: &inverted::NormalNode) -> StructureDefinition {
+    make_profile_recursive(rt, &vec![], node)
+}
+
+pub fn make_profile_recursive(
+    rt: &str,
+    path: &[String],
+    node: &inverted::NormalNode,
+) -> StructureDefinition {
+    StructureDefinition {
+        status: "active".to_string(),
+        base_definition: format!("http://hl7.org/fhir/StructureDefinition/{rt}"),
+        r#abstract: false,
+        url: "http://legacy.aidbox.app/fhir/StructureDefinition/{rt}".to_owned(),
+        name: rt.to_owned(),
+        derivation: "constraint".to_owned(),
+        context: None,
+        differential: StructureDefinitionDifferential {
+            element: make_profile_differential(rt, path, node),
+        },
+        kind: "resource".to_owned(),
+        r#type: rt.to_owned(),
+    }
+}
+
+pub fn make_profile_differential(
+    rt: &str,
+    path: &[String],
+    node: &inverted::NormalNode,
+) -> Vec<ElementDefinition> {
+    let mut result: Vec<ElementDefinition> = Vec::new();
+    let extensions = match node {
+        NormalNode::Complex(node) => Some(&node.extension),
+        NormalNode::Inferred(node) => Some(&node.extension),
+        _ => None,
+    };
+    if let Some(extensions) = extensions {
+        let mut fhir_path = rt.to_owned();
+        for path_component in path {
+            fhir_path.push('.');
+            fhir_path.push_str(&path_component);
+        }
+        fhir_path.push_str(".extension");
+
+        for (url, ext) in extensions {
+            let fce_property = ext.get_fce_property();
+
+            let min = if ext.is_required() { Some(1) } else { None };
+            let max = if ext.is_array() {
+                Some("*".to_owned())
+            } else {
+                None
+            };
+
+            result.push(ElementDefinition {
+                id: format!("{fhir_path}:{fce_property}"),
+                path: fhir_path.clone(),
+                slice_name: Some(fce_property.to_owned()),
+                min: min,
+                max: max,
+                fixed_url: None,
+                slicing: None,
+                r#type: Some(vec![ElementType {
+                    code: "Extension".to_owned(),
+                    target_profile: None,
+                    profile: Some(vec![url.to_owned()]),
+                }]),
+                binding: None,
+                extension: None,
+            })
+        }
+    }
+
+    let children = match node {
+        NormalNode::Complex(node) => Some(&node.children),
+        NormalNode::Inferred(node) => Some(&node.children),
+        _ => None,
+    };
+
+    if let Some(children) = children {
+        for (name, child) in children {
+            let mut subpath = path.to_owned();
+            subpath.push(name.to_owned());
+            let mut subres = make_profile_differential(rt, path, child);
+            result.append(&mut subres);
+        }
+    }
+    result
 }
