@@ -23,7 +23,7 @@ pub struct ElementDefinition {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub binding: Option<Binding>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub extension: Option<Extension>,
+    pub extension: Option<Vec<Extension>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -53,11 +53,15 @@ pub struct ElementSlicing {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StructureDefinition {
+    pub status: String,
+    pub base_definition: String,
+    pub r#abstract: bool,
     pub url: String,
     pub name: String,
     pub derivation: String,
-    pub context: StructureDefinitionContext,
+    pub context: Vec<StructureDefinitionContext>,
     pub differential: StructureDefinitionDifferential,
     pub kind: String,
     pub r#type: String,
@@ -66,7 +70,7 @@ pub struct StructureDefinition {
 #[derive(Debug, Clone, Serialize)]
 pub struct StructureDefinitionContext {
     pub r#type: String,
-    pub code: String,
+    pub expression: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -162,21 +166,24 @@ pub fn emit_extension(
     };
 
     StructureDefinition {
+        base_definition: "http://hl7.org/fhir/StructureDefinition/Extension".to_owned(),
+        r#abstract: false,
+        status: "active".to_owned(),
         url: url.to_owned(),
         differential: StructureDefinitionDifferential {
             element: emit_differential(url, extension),
         },
         name: name,
         derivation: "constraint".to_owned(),
-        context: StructureDefinitionContext {
+        context: vec![StructureDefinitionContext {
             r#type: "element".to_owned(),
-            code: path.iter().fold(rt.to_owned(), |mut acc, component| {
+            expression: path.iter().fold(rt.to_owned(), |mut acc, component| {
                 acc.push('.');
                 acc.push_str(component);
                 acc
             }),
-        },
-        kind: "constraint".to_owned(),
+        }],
+        kind: "complex-type".to_owned(),
         r#type: "Extension".to_owned(),
     }
 }
@@ -194,10 +201,10 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 slicing: None,
                 r#type: None,
                 binding: None,
-                extension: Some(Extension {
+                extension: Some(vec![Extension {
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: simple_extension.fce_property,
-                }),
+                }]),
             };
 
             let url_elem = ElementDefinition {
@@ -274,10 +281,10 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 slicing: None,
                 r#type: None,
                 binding: None,
-                extension: Some(Extension {
+                extension: Some(vec![Extension {
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: complex_extension.fce_property,
-                }),
+                }]),
             };
 
             let base_elem = ElementDefinition {
@@ -361,10 +368,10 @@ pub fn emit_nested(
                 slicing: None,
                 r#type: None,
                 binding: None,
-                extension: Some(Extension {
+                extension: Some(vec![Extension {
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: simple_extension.fce_property.to_owned(),
-                }),
+                }]),
             };
 
             let base_elem_ptr = ElementPointer {
@@ -451,10 +458,10 @@ pub fn emit_nested(
                 slicing: None,
                 r#type: None,
                 binding: None,
-                extension: Some(Extension {
+                extension: Some(vec![Extension {
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: complex_extension.fce_property.to_owned(),
-                }),
+                }]),
             };
 
             let base_elem_ptr = ElementPointer {
