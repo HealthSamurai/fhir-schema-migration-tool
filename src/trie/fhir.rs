@@ -545,13 +545,15 @@ pub fn make_profiles(forest: &inverted::Forest) -> Vec<StructureDefinition> {
     for (rt, trie) in &forest.forest {
         let node = &trie.root;
         let profile = make_profile_for(rt, node);
-        result.push(profile);
+        if let Some(profile) = profile {
+            result.push(profile);
+        }
     }
 
     result
 }
 
-pub fn make_profile_for(rt: &str, node: &inverted::NormalNode) -> StructureDefinition {
+pub fn make_profile_for(rt: &str, node: &inverted::NormalNode) -> Option<StructureDefinition> {
     make_profile_recursive(rt, &vec![], node)
 }
 
@@ -559,21 +561,41 @@ pub fn make_profile_recursive(
     rt: &str,
     path: &[String],
     node: &inverted::NormalNode,
-) -> StructureDefinition {
-    StructureDefinition {
+) -> Option<StructureDefinition> {
+    let mut elements = make_profile_differential(rt, path, node);
+
+    if elements.is_empty() {
+        return None;
+    }
+
+    let mut differential = vec![ElementDefinition {
+        id: rt.to_owned(),
+        path: rt.to_owned(),
+        slice_name: None,
+        min: None,
+        max: None,
+        fixed_url: None,
+        slicing: None,
+        r#type: None,
+        binding: None,
+        extension: None,
+    }];
+    differential.append(&mut elements);
+
+    Some(StructureDefinition {
         status: "active".to_string(),
         base_definition: format!("http://hl7.org/fhir/StructureDefinition/{rt}"),
         r#abstract: false,
-        url: "http://legacy.aidbox.app/fhir/StructureDefinition/{rt}".to_owned(),
+        url: format!("http://legacy.aidbox.app/fhir/StructureDefinition/{rt}"),
         name: rt.to_owned(),
         derivation: "constraint".to_owned(),
         context: None,
         differential: StructureDefinitionDifferential {
-            element: make_profile_differential(rt, path, node),
+            element: differential,
         },
         kind: "resource".to_owned(),
         r#type: rt.to_owned(),
-    }
+    })
 }
 
 pub fn make_profile_differential(
