@@ -624,7 +624,7 @@ pub fn make_profile_differential(
             let max = if ext.is_array() {
                 Some("*".to_owned())
             } else {
-                None
+                Some("1".to_owned())
             };
 
             result.push(ElementDefinition {
@@ -656,7 +656,7 @@ pub fn make_profile_differential(
         for (name, child) in children {
             let mut subpath = path.to_owned();
             subpath.push(name.to_owned());
-            let mut subres = make_profile_differential(rt, path, child);
+            let mut subres = make_profile_differential(rt, &subpath, child);
             result.append(&mut subres);
         }
     }
