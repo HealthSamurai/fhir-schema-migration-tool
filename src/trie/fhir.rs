@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use serde::Serialize;
 use thiserror::Error;
 
@@ -196,12 +194,22 @@ pub fn emit_extension(
 pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<ElementDefinition> {
     match extension {
         inverted::Extension::Simple(simple_extension) => {
+            let min = if simple_extension.required {
+                Some(1)
+            } else {
+                None
+            };
+            let max = if simple_extension.array {
+                None
+            } else {
+                Some("1".to_owned())
+            };
             let root = ElementDefinition {
                 id: "Extension".to_owned(),
                 path: "Extension".to_owned(),
                 slice_name: None,
-                min: Some(0),
-                max: Some("*".to_owned()),
+                min: min,
+                max: max,
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
@@ -277,12 +285,22 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
             differential
         }
         inverted::Extension::Complex(complex_extension) => {
+            let min = if complex_extension.required {
+                Some(1)
+            } else {
+                None
+            };
+            let max = if complex_extension.array {
+                None
+            } else {
+                Some("1".to_owned())
+            };
             let root = ElementDefinition {
                 id: "Extension".to_owned(),
                 path: "Extension".to_owned(),
                 slice_name: None,
-                min: Some(0),
-                max: Some("*".to_owned()),
+                min: min,
+                max: max,
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
@@ -455,12 +473,22 @@ pub fn emit_nested(
             differential
         }
         inverted::Extension::Complex(complex_extension) => {
+            let min = if complex_extension.required {
+                Some(1)
+            } else {
+                None
+            };
+            let max = if complex_extension.array {
+                None
+            } else {
+                Some("1".to_owned())
+            };
             let base_elem = ElementDefinition {
                 id: format!("{}:{}", ptr.id, complex_extension.fce_property),
                 path: ptr.path.to_owned(),
                 slice_name: None,
-                min: Some(0),
-                max: Some("*".to_owned()),
+                min: min,
+                max: max,
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
