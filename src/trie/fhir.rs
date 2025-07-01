@@ -194,22 +194,18 @@ pub fn emit_extension(
 pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<ElementDefinition> {
     match extension {
         inverted::Extension::Simple(simple_extension) => {
-            let min = if simple_extension.required {
-                Some(1)
-            } else {
-                None
-            };
+            let min = if simple_extension.required { 1 } else { 0 };
             let max = if simple_extension.array {
-                None
+                "*".to_owned()
             } else {
-                Some("1".to_owned())
+                "1".to_owned()
             };
             let root = ElementDefinition {
                 id: "Extension".to_owned(),
                 path: "Extension".to_owned(),
                 slice_name: None,
-                min: min,
-                max: max,
+                min: Some(min),
+                max: Some(max),
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
@@ -285,22 +281,18 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
             differential
         }
         inverted::Extension::Complex(complex_extension) => {
-            let min = if complex_extension.required {
-                Some(1)
-            } else {
-                None
-            };
+            let min = if complex_extension.required { 1 } else { 0 };
             let max = if complex_extension.array {
-                None
+                "*".to_owned()
             } else {
-                Some("1".to_owned())
+                "1".to_owned()
             };
             let root = ElementDefinition {
                 id: "Extension".to_owned(),
                 path: "Extension".to_owned(),
                 slice_name: None,
-                min: min,
-                max: max,
+                min: Some(min),
+                max: Some(max),
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
