@@ -52,7 +52,7 @@ pub struct ElementType {
 #[derive(Debug, Clone, Serialize)]
 pub struct ElementSlicing {
     pub rules: String,
-    pub discriminator: ElementSlicingDiscriminator,
+    pub discriminator: Vec<ElementSlicingDiscriminator>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -321,10 +321,10 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 fixed_url: None,
                 slicing: Some(ElementSlicing {
                     rules: "closed".to_owned(),
-                    discriminator: ElementSlicingDiscriminator {
+                    discriminator: vec![ElementSlicingDiscriminator {
                         r#type: "value".to_owned(),
                         path: "url".to_owned(),
-                    },
+                    }],
                 }),
                 r#type: None,
                 binding: None,
@@ -528,10 +528,10 @@ pub fn emit_nested(
                 fixed_url: None,
                 slicing: Some(ElementSlicing {
                     rules: "closed".to_owned(),
-                    discriminator: ElementSlicingDiscriminator {
+                    discriminator: vec![ElementSlicingDiscriminator {
                         r#type: "value".to_owned(),
                         path: "url".to_owned(),
-                    },
+                    }],
                 }),
                 r#type: None,
                 binding: None,
