@@ -2,16 +2,21 @@ pub mod attribute;
 pub mod paths;
 pub mod trie;
 
+use flate2::{Compression, write::GzEncoder};
 use miette::{Diagnostic, miette};
+use serde_json::json;
 use std::{
+    fs::File,
     io::BufReader,
     path::{Path, PathBuf},
     process,
 };
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use thiserror::Error;
 use walkdir::WalkDir;
+
+use crate::trie::fhir::{self, StructureDefinition};
 
 /// Generate structure definition from Aidbox attributes
 #[derive(Debug, Parser)]
@@ -27,6 +32,14 @@ struct Args {
     /// Ignore errors related to isSummary, isModifier, order flags
     #[arg(long)]
     ignore_flags: bool,
+
+    /// Target FHIR version.
+    #[arg(short, long, value_enum)]
+    fhir_version: FhirVersion,
+
+    /// Target IG package file (ex. fce.tgz). If not specified, all resources are written to stdout.
+    #[arg(short, long)]
+    output: Option<PathBuf>,
 }
 
 fn is_json(path: &Path) -> bool {
@@ -68,6 +81,112 @@ enum Error {
         #[source]
         source: attribute::aidbox::Error,
     },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum FhirVersion {
+    #[value(name = "4.0.0")]
+    V4_0_0,
+    #[value(name = "4.0.1")]
+    V4_0_1,
+    #[value(name = "4.3.0")]
+    V4_3_0,
+    #[value(name = "5.0.0")]
+    V5_0_0,
+}
+
+pub fn make_package_json(fhir_version: FhirVersion) -> String {
+    let version_string: &'static str = match fhir_version {
+        FhirVersion::V4_0_0 => "4.0.0",
+        FhirVersion::V4_0_1 => "4.0.1",
+        FhirVersion::V4_3_0 => "4.3.0",
+        FhirVersion::V5_0_0 => "5.0.0",
+    };
+
+    let pkg_name: &'static str = match fhir_version {
+        FhirVersion::V4_0_0 => "hl7.fhir.r4.core",
+        FhirVersion::V4_0_1 => "hl7.fhir.r4.core",
+        FhirVersion::V4_3_0 => "hl7.fhir.r4b.core",
+        FhirVersion::V5_0_0 => "hl7.fhir.r5.core",
+    };
+
+    serde_json::to_string_pretty(&json!({
+        "name": "legacy-fce.aidbox",
+        "version": "0.0.0",
+        "type": "IG",
+        "dependencies": {
+            pkg_name: version_string
+        }
+    }))
+    .unwrap()
+}
+
+pub fn make_package(
+    output: PathBuf,
+    exts: Vec<StructureDefinition>,
+    profiles: Vec<StructureDefinition>,
+    fhir_version: FhirVersion,
+) -> anyhow::Result<()> {
+    let file = File::create(output)?;
+    let gzip = GzEncoder::new(file, Compression::default());
+    let mut tar = tar::Builder::new(gzip);
+
+    {
+        let package_json = make_package_json(fhir_version);
+        let mut header = tar::Header::new_gnu();
+        header.set_size(package_json.as_bytes().len() as u64);
+        header.set_mode(0o644);
+        header.set_mtime(
+            std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as u64)
+                .unwrap_or(0),
+        );
+        header.set_cksum();
+        tar.append_data(&mut header, "package/package.json", package_json.as_bytes())?;
+    }
+
+    for (i, ext) in exts.into_iter().enumerate() {
+        let name = format!(
+            "package/StructureDefinition-Extension-{}-{}.json",
+            &ext.name, i
+        );
+        let sd = serde_json::to_string_pretty(&ext).expect("Bug: invalid genereated SD");
+
+        let mut header = tar::Header::new_gnu();
+        header.set_size(sd.as_bytes().len() as u64);
+        header.set_mode(0o644);
+        header.set_mtime(
+            std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as u64)
+                .unwrap_or(0),
+        );
+        header.set_cksum();
+        tar.append_data(&mut header, name, sd.as_bytes())?;
+    }
+
+    for (i, profile) in profiles.into_iter().enumerate() {
+        let name = format!("package/StructureDefinition-{}-{}.json", &profile.name, i);
+        let sd = serde_json::to_string_pretty(&profile).expect("Bug: invalid genereated SD");
+
+        let mut header = tar::Header::new_gnu();
+        header.set_size(sd.as_bytes().len() as u64);
+        header.set_mode(0o644);
+        header.set_mtime(
+            std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as u64)
+                .unwrap_or(0),
+        );
+        header.set_cksum();
+        tar.append_data(&mut header, name, sd.as_bytes())?;
+    }
+
+    let gzip = tar.into_inner()?;
+    let _file = gzip.finish()?;
+
+    Ok(())
 }
 
 fn main() {
@@ -223,11 +342,21 @@ fn main() {
     }
 
     if !had_errors || args.ignore_errors {
-        for ext in exts {
-            println!("{}", serde_json::to_string_pretty(&ext).unwrap());
-        }
-        for profile in profiles {
-            println!("{}", serde_json::to_string_pretty(&profile).unwrap());
+        if let Some(out_file) = args.output {
+            match make_package(out_file, exts, profiles, args.fhir_version) {
+                Ok(_) => (),
+                Err(error) => {
+                    eprintln!("{:?}", error);
+                    process::exit(1)
+                }
+            };
+        } else {
+            for ext in exts {
+                println!("{}", serde_json::to_string_pretty(&ext).unwrap());
+            }
+            for profile in profiles {
+                println!("{}", serde_json::to_string_pretty(&profile).unwrap());
+            }
         }
     }
 

@@ -57,6 +57,7 @@ pub struct ElementSlicing {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StructureDefinition {
+    pub resource_type: String,
     pub status: String,
     pub base_definition: String,
     pub r#abstract: bool,
@@ -169,6 +170,7 @@ pub fn emit_extension(
     };
 
     StructureDefinition {
+        resource_type: "StructureDefinition".to_owned(),
         base_definition: "http://hl7.org/fhir/StructureDefinition/Extension".to_owned(),
         r#abstract: false,
         status: "active".to_owned(),
@@ -374,12 +376,22 @@ pub fn emit_nested(
 ) -> Vec<ElementDefinition> {
     match extension {
         inverted::Extension::Simple(simple_extension) => {
+            let min = if simple_extension.required {
+                Some(1)
+            } else {
+                None
+            };
+            let max = if simple_extension.array {
+                None
+            } else {
+                Some("1".to_owned())
+            };
             let base_elem = ElementDefinition {
                 id: format!("{}:{}", ptr.id, simple_extension.fce_property),
                 path: ptr.path.to_owned(),
                 slice_name: Some(simple_extension.fce_property.to_owned()),
-                min: Some(0),
-                max: Some("*".to_owned()),
+                min: min,
+                max: max,
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
@@ -603,6 +615,7 @@ pub fn make_profile_recursive(
     differential.append(&mut elements);
 
     Some(StructureDefinition {
+        resource_type: "StructureDefinition".to_owned(),
         status: "active".to_string(),
         base_definition: format!("http://hl7.org/fhir/StructureDefinition/{rt}"),
         r#abstract: false,
