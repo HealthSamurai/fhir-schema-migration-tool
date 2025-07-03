@@ -29,6 +29,7 @@ pub struct ConcreteNode {
     pub required: bool,
     pub target: String,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +48,7 @@ pub struct PolymorphicLeaf {
     pub refers: Option<Vec<String>>,
     pub target: String,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +87,7 @@ pub struct ExtensionTarget {
     pub id: String,
     pub refers: Option<Vec<String>>,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -176,6 +179,7 @@ impl ConcreteNode {
             required: source_node.required,
             target: source_node.target,
             value_set: source_node.value_set,
+            enumeration: source_node.enumeration,
         }
     }
 }
@@ -187,6 +191,7 @@ impl PolymorphicLeaf {
             refers: source_node.refers,
             target: source_node.target,
             value_set: source_node.value_set,
+            enumeration: source_node.enumeration,
         }
     }
 }
@@ -337,6 +342,7 @@ impl SimpleExtension {
                     id: source_node.id.clone(),
                     refers: source_node.refers,
                     value_set: source_node.value_set,
+                    enumeration: source_node.enumeration,
                 },
             )]),
             fce_property: fce_property,
@@ -364,6 +370,7 @@ impl SimpleExtension {
                 id: target.id,
                 refers: target.refers,
                 value_set: target.value_set,
+                enumeration: target.enumeration,
             };
             targets.insert(name, target);
         }

@@ -36,6 +36,7 @@ pub struct AttributeKindConcrete {
     pub target: String,
     pub value_set: Option<String>,
     pub refers: Option<Vec<String>>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -357,6 +358,7 @@ impl Attribute {
                 target,
                 value_set,
                 refers: attr.refers.to_owned(),
+                enumeration: attr.r#enum,
             });
 
             let attr = Some(Attribute {

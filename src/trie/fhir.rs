@@ -24,6 +24,16 @@ pub struct ElementDefinition {
     pub binding: Option<Binding>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extension: Option<Vec<Extension>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constraint: Option<Vec<ElementDefinitionConstraint>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ElementDefinitionConstraint {
+    key: String,
+    severity: String,
+    human: String,
+    expression: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,6 +103,34 @@ pub struct StructureDefinitionDifferential {
 pub enum Error {
     #[error("Todo")]
     Todo,
+}
+
+pub fn escape_fp_string(s: &str) -> String {
+    let mut res = String::new();
+    for c in s.chars() {
+        match c {
+            '\'' | '"' | '`' | '\r' | '\n' | '\t' | '\u{C}' | '\\' => res.push('\\'),
+            _ => (),
+        }
+        res.push(c);
+    }
+    res
+}
+
+pub fn generate_constraint_expression(enumeration: &[String]) -> String {
+    let enumeration: Vec<String> = enumeration
+        .iter()
+        .map(|s| format!("'{}'", escape_fp_string(s)))
+        .collect();
+    format!("%context.subsetOf({})", enumeration.join(","))
+}
+
+pub fn generate_constraint_human(enumeration: &[String]) -> String {
+    let enumeration: Vec<String> = enumeration
+        .iter()
+        .map(|s| format!("'{}'", escape_fp_string(s)))
+        .collect();
+    format!("Value must be one of: {}", enumeration.join(","))
 }
 
 fn collect_extensions_recursive(
@@ -176,6 +214,8 @@ pub fn emit_extension(
         }
     };
 
+    let mut counter: usize = 1;
+
     StructureDefinition {
         resource_type: "StructureDefinition".to_owned(),
         base_definition: "http://hl7.org/fhir/StructureDefinition/Extension".to_owned(),
@@ -183,7 +223,7 @@ pub fn emit_extension(
         status: "active".to_owned(),
         url: url.to_owned(),
         differential: StructureDefinitionDifferential {
-            element: emit_differential(url, extension),
+            element: emit_differential(&mut counter, url, extension),
         },
         name: name,
         derivation: "constraint".to_owned(),
@@ -200,7 +240,11 @@ pub fn emit_extension(
     }
 }
 
-pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<ElementDefinition> {
+pub fn emit_differential(
+    counter: &mut usize,
+    url: String,
+    extension: inverted::Extension,
+) -> Vec<ElementDefinition> {
     match extension {
         inverted::Extension::Simple(simple_extension) => {
             let min = if simple_extension.required { 1 } else { 0 };
@@ -223,6 +267,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: simple_extension.fce_property,
                 }]),
+                constraint: None,
             };
 
             let url_elem = ElementDefinition {
@@ -236,6 +281,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let value_elem = ElementDefinition {
@@ -263,12 +309,25 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 ),
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let mut differential = vec![root, url_elem, value_elem];
 
             for (type_name, target) in simple_extension.targets {
-                if let Some(vs) = &target.value_set {
+                let binding = target.value_set.map(|vs| Binding { value_set: vs });
+                let constraint = target.enumeration.map(|e| {
+                    let constraint = ElementDefinitionConstraint {
+                        key: format!("enum-{counter}"),
+                        severity: "error".to_owned(),
+                        human: generate_constraint_human(&e),
+                        expression: generate_constraint_expression(&e),
+                    };
+                    *counter += 1;
+                    vec![constraint]
+                });
+
+                if binding.is_some() || constraint.is_some() {
                     let elem = ElementDefinition {
                         id: format!("Extension.value[x]:value{}", type_name),
                         path: "Extension.value[x]".to_owned(),
@@ -278,9 +337,8 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                         fixed_url: None,
                         slicing: None,
                         r#type: None,
-                        binding: Some(Binding {
-                            value_set: vs.to_owned(),
-                        }),
+                        binding: binding,
+                        constraint: constraint,
                         extension: None,
                     };
                     differential.push(elem);
@@ -310,6 +368,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: complex_extension.fce_property,
                 }]),
+                constraint: None,
             };
 
             let base_elem = ElementDefinition {
@@ -329,6 +388,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let url_elem = ElementDefinition {
@@ -342,6 +402,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let value_elem = ElementDefinition {
@@ -355,6 +416,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let mut nested: Vec<ElementDefinition> = Vec::new();
@@ -365,7 +427,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
             };
 
             for (url, child) in complex_extension.extension {
-                nested.append(&mut emit_nested(&ptr, url, child));
+                nested.append(&mut emit_nested(counter, &ptr, url, child));
             }
 
             let mut res = Vec::new();
@@ -381,6 +443,7 @@ pub fn emit_differential(url: String, extension: inverted::Extension) -> Vec<Ele
 }
 
 pub fn emit_nested(
+    counter: &mut usize,
     ptr: &ElementPointer,
     url: String,
     extension: inverted::Extension,
@@ -411,6 +474,7 @@ pub fn emit_nested(
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: simple_extension.fce_property.to_owned(),
                 }]),
+                constraint: None,
             };
 
             let base_elem_ptr = ElementPointer {
@@ -429,6 +493,7 @@ pub fn emit_nested(
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let value_elem = ElementDefinition {
@@ -456,6 +521,7 @@ pub fn emit_nested(
                 ),
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let value_elem_ptr = ElementPointer {
@@ -466,7 +532,18 @@ pub fn emit_nested(
             let mut differential = vec![base_elem, url_elem, value_elem];
 
             for (type_name, target) in simple_extension.targets {
-                if let Some(vs) = &target.value_set {
+                let binding = target.value_set.map(|vs| Binding { value_set: vs });
+                let constraint = target.enumeration.map(|e| {
+                    let constraint = ElementDefinitionConstraint {
+                        key: format!("enum-{counter}"),
+                        severity: "error".to_owned(),
+                        human: generate_constraint_human(&e),
+                        expression: generate_constraint_expression(&e),
+                    };
+                    *counter += 1;
+                    vec![constraint]
+                });
+                if binding.is_some() || constraint.is_some() {
                     let elem = ElementDefinition {
                         id: format!("{}:value{}", value_elem_ptr.id, type_name),
                         path: value_elem_ptr.path.to_owned(),
@@ -476,10 +553,9 @@ pub fn emit_nested(
                         fixed_url: None,
                         slicing: None,
                         r#type: None,
-                        binding: Some(Binding {
-                            value_set: vs.to_owned(),
-                        }),
+                        binding: binding,
                         extension: None,
+                        constraint: constraint,
                     };
                     differential.push(elem);
                 }
@@ -512,6 +588,7 @@ pub fn emit_nested(
                     url: "http://fhir.aidbox.app/fhir/StructureDefinition/legacy-fce".to_owned(),
                     value_string: complex_extension.fce_property.to_owned(),
                 }]),
+                constraint: None,
             };
 
             let base_elem_ptr = ElementPointer {
@@ -536,6 +613,7 @@ pub fn emit_nested(
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let extension_elem_ptr = ElementPointer {
@@ -554,6 +632,7 @@ pub fn emit_nested(
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let value_elem = ElementDefinition {
@@ -567,12 +646,13 @@ pub fn emit_nested(
                 r#type: None,
                 binding: None,
                 extension: None,
+                constraint: None,
             };
 
             let mut nested: Vec<ElementDefinition> = Vec::new();
 
             for (url, child) in complex_extension.extension {
-                nested.append(&mut emit_nested(&extension_elem_ptr, url, child));
+                nested.append(&mut emit_nested(counter, &extension_elem_ptr, url, child));
             }
 
             let mut res = Vec::new();
@@ -626,6 +706,7 @@ pub fn make_profile_recursive(
         r#type: None,
         binding: None,
         extension: None,
+        constraint: None,
     }];
     differential.append(&mut elements);
 
@@ -690,6 +771,7 @@ pub fn make_profile_differential(
                 }]),
                 binding: None,
                 extension: None,
+                constraint: None,
             })
         }
     }

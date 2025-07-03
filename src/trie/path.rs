@@ -42,6 +42,7 @@ pub struct ConcreteNode {
     pub resource_type: String,
     pub target: String,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +56,7 @@ pub struct ConcreteExtension {
     pub resource_type: String,
     pub target: String,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -189,6 +191,7 @@ impl Node {
                         resource_type: attribute.resource_type,
                         target: attribute_kind_concrete.target,
                         value_set: attribute_kind_concrete.value_set,
+                        enumeration: attribute_kind_concrete.enumeration,
                     }))
                 }
 
@@ -202,6 +205,7 @@ impl Node {
                         resource_type: attribute.resource_type,
                         target: attribute_kind_concrete.target,
                         value_set: attribute_kind_concrete.value_set,
+                        enumeration: attribute_kind_concrete.enumeration,
                         fce: fce,
                     }))
                 }
@@ -253,6 +257,7 @@ impl Extension {
                 resource_type: concrete_extension.resource_type,
                 target: concrete_extension.target,
                 value_set: concrete_extension.value_set,
+                enumeration: concrete_extension.enumeration,
             }),
             Extension::Polymorphic(polymorphic_extension) => {
                 NormalNode::Polymorphic(PolymorphicNode {

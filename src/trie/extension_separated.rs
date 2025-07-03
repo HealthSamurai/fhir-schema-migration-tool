@@ -38,6 +38,7 @@ pub struct ConcreteNode {
     pub resource_type: String,
     pub target: String,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +51,7 @@ pub struct ConcreteExtension {
     pub resource_type: String,
     pub target: String,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +84,7 @@ pub struct PolymorphicLeaf {
     pub resource_type: String,
     pub target: String,
     pub value_set: Option<String>,
+    pub enumeration: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -289,6 +292,7 @@ impl ConcreteNode {
             resource_type: source_node.resource_type,
             target: source_node.target,
             value_set: source_node.value_set,
+            enumeration: source_node.enumeration,
         };
 
         (node, errors)
@@ -310,6 +314,7 @@ impl ConcreteNode {
             resource_type: source_node.resource_type,
             target: source_node.target,
             value_set: source_node.value_set,
+            enumeration: source_node.enumeration,
         };
 
         (node, errors)
@@ -334,6 +339,7 @@ impl ConcreteExtension {
             resource_type: source_node.resource_type,
             target: source_node.target,
             value_set: source_node.value_set,
+            enumeration: source_node.enumeration,
         };
 
         (node, errors)
@@ -361,6 +367,7 @@ impl PolymorphicLeaf {
             resource_type: source_node.resource_type,
             target: source_node.target,
             value_set: source_node.value_set,
+            enumeration: source_node.enumeration,
         };
 
         (node, errors)
@@ -386,6 +393,7 @@ impl PolymorphicLeaf {
             resource_type: source_node.resource_type,
             target: source_node.target,
             value_set: source_node.value_set,
+            enumeration: source_node.enumeration,
         };
 
         (node, errors)

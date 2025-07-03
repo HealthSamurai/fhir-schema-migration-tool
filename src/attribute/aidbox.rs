@@ -53,7 +53,7 @@ pub struct Attribute {
     pub is_unique: Option<bool>,
 
     /// List of allowed values
-    pub r#enum: Option<String>,
+    pub r#enum: Option<Vec<String>>,
 
     /// I don't know
     pub order: Option<i64>,
@@ -71,6 +71,9 @@ pub struct Attribute {
     pub refers: Option<Vec<String>>,
 
     pub resource_type: Option<String>,
+
+    #[serde(rename = "_source")]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Error, Diagnostic)]
