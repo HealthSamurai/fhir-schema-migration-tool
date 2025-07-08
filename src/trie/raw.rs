@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::attribute::typed::Attribute;
 
+#[derive(Debug, Clone)]
 pub struct Forest {
     pub forest: BTreeMap<String, Trie>,
 }
