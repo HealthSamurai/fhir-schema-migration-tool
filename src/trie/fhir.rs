@@ -301,7 +301,9 @@ pub fn emit_differential(
                             profile: None,
                             target_profile: target_info.refers.as_ref().map(|refs| {
                                 refs.into_iter()
-                                    .map(|tref| format!("http://hl7.org/fhir/{}", tref))
+                                    .map(|tref| {
+                                        format!("http://hl7.org/fhir/StructureDefinition/{}", tref)
+                                    })
                                     .collect()
                             }),
                         })
@@ -513,7 +515,9 @@ pub fn emit_nested(
                             profile: None,
                             target_profile: target_info.refers.as_ref().map(|refs| {
                                 refs.iter()
-                                    .map(|tref| format!("http://hl7.org/fhir/{}", tref))
+                                    .map(|tref| {
+                                        format!("http://hl7.org/fhir/StructureDefinition/{}", tref)
+                                    })
                                     .collect()
                             }),
                         })
