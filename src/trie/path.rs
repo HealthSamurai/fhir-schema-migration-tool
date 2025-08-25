@@ -177,7 +177,7 @@ impl Node {
                         required: attribute.required,
                         resource_type: attribute.resource_type,
                         targets: attribute_kind_poly.targets,
-                        fce: fce,
+                        fce,
                     }))
                 }
 
@@ -206,7 +206,7 @@ impl Node {
                         target: attribute_kind_concrete.target,
                         value_set: attribute_kind_concrete.value_set,
                         enumeration: attribute_kind_concrete.enumeration,
-                        fce: fce,
+                        fce,
                     }))
                 }
 
@@ -228,7 +228,7 @@ impl Node {
                         required: attribute.required,
                         resource_type: attribute.resource_type,
                         children,
-                        fce: fce,
+                        fce,
                     }))
                 }
             },

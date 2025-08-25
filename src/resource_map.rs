@@ -1,4 +1,4 @@
-const AIDBOX_CUSTOM_TYPES: [(&'static str, &'static str); 84] = [
+const AIDBOX_CUSTOM_TYPES: [(&str, &str); 84] = [
     (
         "AccessPolicy",
         "http://aidbox.app/StructureDefinition/AccessPolicy",
@@ -238,7 +238,7 @@ const AIDBOX_CUSTOM_TYPES: [(&'static str, &'static str); 84] = [
     ("ui_snippet", "ui_snippet"),
 ];
 
-const FHIR_TYPES: [&'static str; 231] = [
+const FHIR_TYPES: [&str; 231] = [
     "Base",
     "Element",
     "BackboneElement",

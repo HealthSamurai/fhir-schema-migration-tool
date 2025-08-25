@@ -688,7 +688,7 @@ pub fn make_profiles(forest: &inverted::Forest) -> Vec<StructureDefinition> {
 }
 
 pub fn make_profile_for(rt: &str, node: &inverted::NormalNode) -> Option<StructureDefinition> {
-    make_profile_recursive(rt, &vec![], node)
+    make_profile_recursive(rt, &[], node)
 }
 
 pub fn make_profile_recursive(
@@ -751,7 +751,7 @@ pub fn make_profile_differential(
         let mut fhir_path = rt.to_owned();
         for path_component in path {
             fhir_path.push('.');
-            fhir_path.push_str(&path_component);
+            fhir_path.push_str(path_component);
         }
         fhir_path.push_str(".extension");
 

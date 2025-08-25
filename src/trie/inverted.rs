@@ -345,7 +345,7 @@ impl SimpleExtension {
                     enumeration: source_node.enumeration,
                 },
             )]),
-            fce_property: fce_property,
+            fce_property,
             id: source_node.id,
             required: source_node.required,
         }
@@ -378,7 +378,7 @@ impl SimpleExtension {
         let node = Self {
             array: source_node.array,
             targets,
-            fce_property: fce_property,
+            fce_property,
             id: source_node.id,
             required: source_node.required,
         };
@@ -408,7 +408,7 @@ impl ComplexExtension {
 
         let node = Self {
             array: source_node.array,
-            fce_property: fce_property,
+            fce_property,
             id: source_node.id,
             open: source_node.open,
             required: source_node.required,

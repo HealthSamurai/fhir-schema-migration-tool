@@ -67,7 +67,7 @@ fn is_json_or_yaml(path: &Path) -> bool {
 enum Error {
     #[error("Error while searching for JSON and YAML files in {base_path}")]
     #[diagnostic(help("Ensure the directory name is correct and you have access rights"))]
-    WalkError {
+    Walk {
         base_path: PathBuf,
         #[source]
         source: walkdir::Error,
@@ -142,12 +142,12 @@ pub fn make_package(
     {
         let package_json = make_package_json(fhir_version);
         let mut header = tar::Header::new_gnu();
-        header.set_size(package_json.as_bytes().len() as u64);
+        header.set_size(package_json.len() as u64);
         header.set_mode(0o644);
         header.set_mtime(
             std::time::SystemTime::now()
                 .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .map(|duration| duration.as_secs() as u64)
+                .map(|duration| duration.as_secs())
                 .unwrap_or(0),
         );
         header.set_cksum();
@@ -162,12 +162,12 @@ pub fn make_package(
         let sd = serde_json::to_string_pretty(&ext).expect("Bug: invalid genereated SD");
 
         let mut header = tar::Header::new_gnu();
-        header.set_size(sd.as_bytes().len() as u64);
+        header.set_size(sd.len() as u64);
         header.set_mode(0o644);
         header.set_mtime(
             std::time::SystemTime::now()
                 .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .map(|duration| duration.as_secs() as u64)
+                .map(|duration| duration.as_secs())
                 .unwrap_or(0),
         );
         header.set_cksum();
@@ -179,12 +179,12 @@ pub fn make_package(
         let sd = serde_json::to_string_pretty(&profile).expect("Bug: invalid genereated SD");
 
         let mut header = tar::Header::new_gnu();
-        header.set_size(sd.as_bytes().len() as u64);
+        header.set_size(sd.len() as u64);
         header.set_mode(0o644);
         header.set_mtime(
             std::time::SystemTime::now()
                 .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .map(|duration| duration.as_secs() as u64)
+                .map(|duration| duration.as_secs())
                 .unwrap_or(0),
         );
         header.set_cksum();
@@ -223,7 +223,7 @@ fn main() {
                 had_errors = true;
                 eprintln!(
                     "{:?}",
-                    miette::Report::new(Error::WalkError {
+                    miette::Report::new(Error::Walk {
                         base_path: path.clone(),
                         source: error
                     })
