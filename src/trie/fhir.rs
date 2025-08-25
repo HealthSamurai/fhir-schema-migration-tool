@@ -1,7 +1,10 @@
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::trie::inverted::{self, NormalNode};
+use crate::{
+    resource_map,
+    trie::inverted::{self, NormalNode},
+};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -300,7 +303,7 @@ pub fn emit_differential(
                             code: target_type.to_owned(),
                             profile: None,
                             target_profile: target_info.refers.as_ref().map(|refs| {
-                                refs.into_iter()
+                                refs.iter()
                                     .map(|tref| {
                                         format!("http://hl7.org/fhir/StructureDefinition/{}", tref)
                                     })
@@ -717,10 +720,12 @@ pub fn make_profile_recursive(
     Some(StructureDefinition {
         resource_type: "StructureDefinition".to_owned(),
         status: "active".to_string(),
-        base_definition: format!("http://hl7.org/fhir/StructureDefinition/{rt}"),
+        base_definition: resource_map::get_type_url(rt).expect(
+            "Internal error: could not get url for type. This must have been checked earlier.",
+        ),
         r#abstract: false,
-        url: format!("http://legacy.aidbox.app/fhir/StructureDefinition/{rt}"),
-        name: rt.to_owned(),
+        url: format!("http://legacy.aidbox.app/fhir/StructureDefinition/{rt}-fce"),
+        name: format!("{rt}_fce"),
         derivation: "constraint".to_owned(),
         context: None,
         differential: StructureDefinitionDifferential {

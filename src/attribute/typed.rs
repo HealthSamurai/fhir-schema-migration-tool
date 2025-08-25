@@ -328,7 +328,6 @@ impl Attribute {
         } else {
             None
         };
-        let value_set = value_set;
 
         let (target, error) = Self::parse_type(attr_type);
         if let Some(error) = error {

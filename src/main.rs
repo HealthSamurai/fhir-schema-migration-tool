@@ -1,5 +1,6 @@
 pub mod attribute;
 pub mod paths;
+pub mod resource_map;
 pub mod trie;
 
 use flate2::{Compression, write::GzEncoder};
@@ -40,6 +41,10 @@ struct Args {
     /// Target IG package file (ex. fce.tgz). If not specified, all resources are written to stdout.
     #[arg(short, long)]
     output: Option<PathBuf>,
+
+    /// Exclude type from generating (e.g. for custom resources).
+    #[arg(short, long)]
+    exclude: Vec<String>,
 }
 
 fn is_json(path: &Path) -> bool {
@@ -81,6 +86,9 @@ enum Error {
         #[source]
         source: attribute::aidbox::Error,
     },
+
+    #[error("Unknown resource type {resource_type}")]
+    UnknownResourceType { resource_type: String },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -270,6 +278,22 @@ fn main() {
     let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
 
     for aidbox_attribute in aidbox_attributes {
+        if aidbox_attribute.resource.resource_type == "Entity"
+            && args.exclude.contains(&aidbox_attribute.resource.id)
+        {
+            continue;
+        } else if aidbox_attribute.resource.resource_type == "Entity"
+            && !resource_map::is_known_type(&aidbox_attribute.resource.id)
+        {
+            had_errors = true;
+            eprintln!(
+                "{:?}",
+                miette::Report::new(Error::UnknownResourceType {
+                    resource_type: aidbox_attribute.resource.id.clone()
+                })
+            )
+        }
+
         let (typed_attribute, errors) = attribute::typed::Attribute::build_from(aidbox_attribute);
 
         let errors = if args.ignore_flags {
