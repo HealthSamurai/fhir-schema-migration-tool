@@ -225,7 +225,7 @@ pub fn emit_extension(
         differential: StructureDefinitionDifferential {
             element: emit_differential(&mut counter, url, extension),
         },
-        name: name,
+        name,
         derivation: "constraint".to_owned(),
         context: Some(vec![StructureDefinitionContext {
             r#type: "element".to_owned(),
@@ -339,8 +339,8 @@ pub fn emit_differential(
                         fixed_url: None,
                         slicing: None,
                         r#type: None,
-                        binding: binding,
-                        constraint: constraint,
+                        binding,
+                        constraint,
                         extension: None,
                     };
                     differential.push(elem);
@@ -466,8 +466,8 @@ pub fn emit_nested(
                 id: format!("{}:{}", ptr.id, simple_extension.fce_property),
                 path: ptr.path.to_owned(),
                 slice_name: Some(simple_extension.fce_property.to_owned()),
-                min: min,
-                max: max,
+                min,
+                max,
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
@@ -557,9 +557,9 @@ pub fn emit_nested(
                         fixed_url: None,
                         slicing: None,
                         r#type: None,
-                        binding: binding,
+                        binding,
                         extension: None,
-                        constraint: constraint,
+                        constraint,
                     };
                     differential.push(elem);
                 }
@@ -582,8 +582,8 @@ pub fn emit_nested(
                 id: format!("{}:{}", ptr.id, complex_extension.fce_property),
                 path: ptr.path.to_owned(),
                 slice_name: Some(complex_extension.fce_property.to_owned()),
-                min: min,
-                max: max,
+                min,
+                max,
                 fixed_url: None,
                 slicing: None,
                 r#type: None,
@@ -764,8 +764,8 @@ pub fn make_profile_differential(
                 id: format!("{fhir_path}:{fce_property}"),
                 path: fhir_path.clone(),
                 slice_name: Some(fce_property.to_owned()),
-                min: min,
-                max: max,
+                min,
+                max,
                 fixed_url: None,
                 slicing: None,
                 r#type: Some(vec![ElementType {
