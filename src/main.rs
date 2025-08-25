@@ -3,7 +3,7 @@ pub mod paths;
 pub mod trie;
 
 use flate2::{Compression, write::GzEncoder};
-use miette::{Diagnostic, miette};
+use miette::Diagnostic;
 use serde_json::json;
 use std::{
     fs::File,
@@ -16,7 +16,7 @@ use clap::{Parser, ValueEnum};
 use thiserror::Error;
 use walkdir::WalkDir;
 
-use crate::trie::fhir::{self, StructureDefinition};
+use crate::trie::fhir::StructureDefinition;
 
 /// Generate structure definition from Aidbox attributes
 #[derive(Debug, Parser)]

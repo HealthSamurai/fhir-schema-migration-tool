@@ -29,11 +29,11 @@ pub struct ElementDefinition {
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct ElementDefinitionConstraint {
-    key: String,
-    severity: String,
-    human: String,
-    expression: String,
+pub struct ElementDefinitionConstraint {
+    pub key: String,
+    pub severity: String,
+    pub human: String,
+    pub expression: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

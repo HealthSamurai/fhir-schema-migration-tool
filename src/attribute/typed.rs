@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -321,7 +319,6 @@ impl Attribute {
             errors.push(InvalidConcrete::OpenSchema.into());
         }
 
-        let mut value_set: Option<String> = None;
         let value_set = if let Some(value_set_ref) = &attr.value_set {
             let (value_set, error) = Self::parse_value_set(value_set_ref);
             if let Some(error) = error {
