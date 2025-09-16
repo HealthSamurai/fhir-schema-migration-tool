@@ -1,7 +1,11 @@
 [package]
-name = "atr2sd"
+name = "fhir-schema-migration-tool"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["Vasilii Kupriakov <vk@health-samurai.io>"]
+readme = "README.md"
+repository = "http://github.com/HealthSamurai/fhir-schema-migration-tool"
 
 [dependencies]
 anyhow = "1.0.98"
