@@ -1,4 +1,5 @@
 pub mod attribute;
+pub mod builtin;
 pub mod paths;
 pub mod resource_map;
 pub mod search_param;
@@ -281,6 +282,7 @@ fn read_data(path: &Path) -> Result<Data, Error> {
 }
 
 fn main() {
+    // println!("{:#?}", get_builtin_resources(FhirVersion::V4_0_1));
     _ = miette::set_hook(Box::new(|_| {
         Box::new(
             miette::MietteHandlerOpts::new()
@@ -336,6 +338,10 @@ fn main() {
     }
 
     let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
+
+    for aidbox_sp in aidbox_search_params {
+        let _ = search_param::fhir::convert(&aidbox_sp);
+    }
 
     for aidbox_attribute in aidbox_attributes {
         if aidbox_attribute.resource.resource_type == "Entity"

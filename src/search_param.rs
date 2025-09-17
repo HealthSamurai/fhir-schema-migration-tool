@@ -1,5 +1,9 @@
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 use serde_json::Value;
+
+pub mod fhir;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SearchParameter {
@@ -29,22 +33,23 @@ pub struct SearchParameter {
 #[serde(untagged)]
 pub enum SearchParameterExpressionItem {
     Path(String),
-    Filter(serde_json::Map<String, Value>),
+    Index(usize),
+    Filter(BTreeMap<String, Value>),
 }
 
 pub type SearchParameterExpression = Vec<SearchParameterExpressionItem>;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchParameterType {
-    String,
-    Number,
+    Composite,
     Date,
-    Token,
+    Number,
     Quantity,
     Reference,
+    String,
+    Token,
     Uri,
-    Composite,
 }
 
 #[derive(Debug, Clone, Deserialize)]

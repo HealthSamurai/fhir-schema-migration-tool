@@ -11,7 +11,7 @@ use thiserror::Error;
 /// Entity attribute metadata
 pub struct Attribute {
     /// Attribute id as stored in the database
-    pub id: String,
+    pub id: Option<String>,
 
     /// Path of the element this attribute is describing
     pub path: Vec<String>,

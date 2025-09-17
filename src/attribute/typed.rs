@@ -42,10 +42,11 @@ pub struct AttributeKindComplex {
     pub open: bool,
 }
 
+// FIXME: something better than <missing id>
 #[derive(Debug, Error, Diagnostic)]
-#[error("Attribute {id} is invalid")]
+#[error("Attribute {} is invalid", id.clone().unwrap_or(String::from("<missing id>")))]
 pub struct Error {
-    pub id: String,
+    pub id: Option<String>,
     #[source]
     #[diagnostic_source]
     #[diagnostic(transparent)]
@@ -54,6 +55,12 @@ pub struct Error {
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum InvalidAttributeError {
+    #[error("Missing id property")]
+    #[diagnostic(help(
+        "The id property is important for automatic conversion. Populate the id properties or extract Attributes from live Aidbox."
+    ))]
+    MissingId,
+
     #[error("Both union and type cannot be present")]
     #[diagnostic(help(
         "In Aidbox union takes the effect. To avoid ambiguity during conversion, leave only one."
@@ -346,6 +353,11 @@ impl Attribute {
                 errors.push(InvalidConcrete::RefersOnNonReferenceType(target.clone()).into());
             }
 
+            let Some(id) = attr.id else {
+                errors.push(InvalidAttributeError::MissingId);
+                return (None, errors);
+            };
+
             let Some(resource_type) = resource_type else {
                 return (None, errors);
             };
@@ -358,7 +370,7 @@ impl Attribute {
             });
 
             let attr = Some(Attribute {
-                id: attr.id,
+                id,
                 path: attr.path,
                 resource_type,
                 kind,
@@ -421,6 +433,11 @@ impl Attribute {
         }
         let targets = targets;
 
+        let Some(id) = attr.id else {
+            errors.push(InvalidAttributeError::MissingId);
+            return (None, errors);
+        };
+
         let Some(resource_type) = resource_type else {
             return (None, errors);
         };
@@ -431,7 +448,7 @@ impl Attribute {
 
         let kind = AttributeKind::Poly(AttributeKindPoly { targets });
         let attr = Some(Attribute {
-            id: attr.id,
+            id,
             path: attr.path,
             resource_type,
             kind,
@@ -468,6 +485,11 @@ impl Attribute {
             errors.push(InvalidComplex::RefersPresent.into());
         }
 
+        let Some(id) = attr.id else {
+            errors.push(InvalidAttributeError::MissingId);
+            return (None, errors);
+        };
+
         let Some(resource_type) = resource_type else {
             return (None, errors);
         };
@@ -476,7 +498,7 @@ impl Attribute {
             open: attr.is_open.is_some_and(|x| x),
         });
         let attr = Some(Attribute {
-            id: attr.id,
+            id,
             path: attr.path,
             resource_type,
             kind,
