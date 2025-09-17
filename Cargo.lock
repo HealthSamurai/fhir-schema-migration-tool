@@ -74,22 +74,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
-name = "atr2sd"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "flate2",
- "miette",
- "serde",
- "serde_json",
- "serde_yaml",
- "tar",
- "thiserror",
- "walkdir",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -194,6 +178,22 @@ checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
  "windows-sys",
+]
+
+[[package]]
+name = "fhir-schema-migration-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "flate2",
+ "miette",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tar",
+ "thiserror",
+ "walkdir",
 ]
 
 [[package]]
