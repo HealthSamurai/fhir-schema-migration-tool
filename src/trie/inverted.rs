@@ -58,14 +58,17 @@ pub struct ComplexNode {
     pub open: bool,
     pub required: bool,
     pub children: BTreeMap<String, NormalNode>,
-    pub extension: BTreeMap<String, Extension>,
+    pub extension: BTreeMap<ExtUrl, Extension>,
 }
 
 #[derive(Debug, Clone)]
 pub struct InferredNode {
     pub children: BTreeMap<String, NormalNode>,
-    pub extension: BTreeMap<String, Extension>,
+    pub extension: BTreeMap<ExtUrl, Extension>,
 }
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+pub struct ExtUrl(pub String);
 
 #[derive(Debug, Clone)]
 pub enum Extension {
@@ -97,7 +100,7 @@ pub struct ComplexExtension {
     pub id: String,
     pub open: bool,
     pub required: bool,
-    pub extension: BTreeMap<String, Extension>,
+    pub extension: BTreeMap<ExtUrl, Extension>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -219,7 +222,7 @@ impl ComplexNode {
     pub fn build_from(source_node: extension_separated::ComplexNode) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         let mut children: BTreeMap<String, NormalNode> = BTreeMap::new();
-        let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
+        let mut extension: BTreeMap<ExtUrl, Extension> = BTreeMap::new();
         for (name, source_child) in source_node.children {
             let (node, mut build_errors) = NormalNode::build_from(source_child);
             errors.append(&mut build_errors);
@@ -227,11 +230,11 @@ impl ComplexNode {
         }
 
         for (name, source_ext) in source_node.extension {
-            let url = source_ext.get_url().to_owned();
+            let url = ExtUrl(source_ext.get_url().to_owned());
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
             if extension.contains_key(&url) {
-                errors.push(Error::DuplicateExtensionUrl { url: url.clone() })
+                errors.push(Error::DuplicateExtensionUrl { url: url.0 })
             } else {
                 extension.insert(url, node);
             }
@@ -254,7 +257,7 @@ impl InferredNode {
     pub fn build_from(source_node: extension_separated::InferredNode) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
         let mut children: BTreeMap<String, NormalNode> = BTreeMap::new();
-        let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
+        let mut extension: BTreeMap<ExtUrl, Extension> = BTreeMap::new();
         for (name, source_child) in source_node.children {
             let (node, mut build_errors) = NormalNode::build_from(source_child);
             errors.append(&mut build_errors);
@@ -262,11 +265,11 @@ impl InferredNode {
         }
 
         for (name, source_ext) in source_node.extension {
-            let url = source_ext.get_url().to_owned();
+            let url = ExtUrl(source_ext.get_url().to_owned());
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
             if extension.contains_key(&url) {
-                errors.push(Error::DuplicateExtensionUrl { url })
+                errors.push(Error::DuplicateExtensionUrl { url: url.0 })
             } else {
                 extension.insert(url, node);
             }
@@ -393,14 +396,14 @@ impl ComplexExtension {
         fce_property: String,
     ) -> (Self, Vec<Error>) {
         let mut errors: Vec<Error> = Vec::new();
-        let mut extension: BTreeMap<String, Extension> = BTreeMap::new();
+        let mut extension: BTreeMap<ExtUrl, Extension> = BTreeMap::new();
 
         for (name, source_ext) in source_node.extension {
-            let url = source_ext.get_url().to_owned();
+            let url = ExtUrl(source_ext.get_url().to_owned());
             let (node, mut build_errors) = Extension::build_from(source_ext, name);
             errors.append(&mut build_errors);
             if extension.contains_key(&url) {
-                errors.push(Error::DuplicateExtensionUrl { url })
+                errors.push(Error::DuplicateExtensionUrl { url: url.0 })
             } else {
                 extension.insert(url, node);
             }

@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::{
     resource_map,
-    trie::inverted::{self, NormalNode},
+    trie::inverted::{self, ExtUrl, NormalNode},
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -158,7 +158,7 @@ fn collect_extensions_recursive(
             }
 
             for (url, ext) in complex_node.extension {
-                let ext = emit_extension(rt, path, url, ext);
+                let ext = emit_extension(rt, path, url.0, ext);
                 result.push(ext);
             }
         }
@@ -172,7 +172,7 @@ fn collect_extensions_recursive(
                 errors.append(&mut child_errors);
             }
             for (url, ext) in inferred_node.extension {
-                let ext = emit_extension(rt, path, url, ext);
+                let ext = emit_extension(rt, path, url.0, ext);
                 result.push(ext);
             }
         }
@@ -450,7 +450,7 @@ pub fn emit_differential(
 pub fn emit_nested(
     counter: &mut usize,
     ptr: &ElementPointer,
-    url: String,
+    url: ExtUrl,
     extension: inverted::Extension,
 ) -> Vec<ElementDefinition> {
     match extension {
@@ -493,7 +493,7 @@ pub fn emit_nested(
                 slice_name: None,
                 min: Some(1),
                 max: Some("1".to_owned()),
-                fixed_url: Some(url.to_owned()),
+                fixed_url: Some(url.0.to_owned()),
                 slicing: None,
                 r#type: None,
                 binding: None,
@@ -634,7 +634,7 @@ pub fn emit_nested(
                 slice_name: None,
                 min: Some(1),
                 max: Some("1".to_owned()),
-                fixed_url: Some(url.to_owned()),
+                fixed_url: Some(url.0.to_owned()),
                 slicing: None,
                 r#type: None,
                 binding: None,
@@ -776,7 +776,7 @@ pub fn make_profile_differential(
                 r#type: Some(vec![ElementType {
                     code: "Extension".to_owned(),
                     target_profile: None,
-                    profile: Some(vec![url.to_owned()]),
+                    profile: Some(vec![url.0.to_owned()]),
                 }]),
                 binding: None,
                 extension: None,
