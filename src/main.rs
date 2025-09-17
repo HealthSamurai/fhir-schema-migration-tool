@@ -1,6 +1,7 @@
 pub mod attribute;
 pub mod paths;
 pub mod resource_map;
+pub mod search_param;
 pub mod trie;
 
 use flate2::{Compression, write::GzEncoder};
@@ -17,7 +18,7 @@ use clap::{Parser, ValueEnum};
 use thiserror::Error;
 use walkdir::WalkDir;
 
-use crate::trie::fhir::StructureDefinition;
+use crate::{search_param::SearchParameter, trie::fhir::StructureDefinition};
 
 /// Generate structure definition from Aidbox attributes
 #[derive(Debug, Parser)]
@@ -84,11 +85,41 @@ enum Error {
     BadAttribute {
         filename: PathBuf,
         #[source]
-        source: attribute::aidbox::Error,
+        source: serde_json::Error,
     },
 
-    #[error("Unknown resource type {resource_type}")]
-    UnknownResourceType { resource_type: String },
+    #[error("Could not read {filename} as Aidbox search parameter")]
+    BadSearchParameter {
+        filename: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+
+    #[error("Could not parse {filename} as JSON")]
+    BadJson {
+        filename: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+
+    #[error("Could not parse {filename} as YAML")]
+    BadYaml {
+        filename: PathBuf,
+        #[source]
+        source: serde_yaml::Error,
+    },
+
+    #[error("Not allowed target resource type {resource_type}")]
+    NotAllowedTargetResource { resource_type: String },
+
+    #[error("Not supported resource type {resource_type} in {filename}")]
+    NotSupportedResourceType {
+        filename: PathBuf,
+        resource_type: String,
+    },
+
+    #[error("Missing resource type in {filename}")]
+    MissingResourceType { filename: PathBuf },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -197,6 +228,58 @@ pub fn make_package(
     Ok(())
 }
 
+fn read_file(path: &Path) -> Result<serde_json::Value, Error> {
+    let file = std::fs::File::open(path).map_err(|error| Error::ReadFile {
+        filename: path.to_owned(),
+        source: error,
+    })?;
+    let file = BufReader::new(file);
+    if is_json(path) {
+        serde_json::from_reader(file).map_err(|error| Error::BadJson {
+            filename: path.to_owned(),
+            source: error,
+        })
+    } else {
+        serde_yaml::from_reader(file).map_err(|error| Error::BadYaml {
+            filename: path.to_owned(),
+            source: error,
+        })
+    }
+}
+
+#[derive(Debug)]
+enum Data {
+    Attribute(attribute::aidbox::Attribute),
+    SearchParameter(SearchParameter),
+}
+
+fn read_data(path: &Path) -> Result<Data, Error> {
+    let raw_data: serde_json::Value = read_file(path)?;
+    match raw_data["resourceType"].as_str() {
+        Some("Attribute") => serde_json::from_value::<attribute::aidbox::Attribute>(raw_data)
+            .map(Data::Attribute)
+            .map_err(|error| Error::BadAttribute {
+                filename: path.to_owned(),
+                source: error,
+            }),
+        Some("SearchParameter") => {
+            serde_json::from_value::<search_param::SearchParameter>(raw_data)
+                .map(Data::SearchParameter)
+                .map_err(|error| Error::BadSearchParameter {
+                    filename: path.to_owned(),
+                    source: error,
+                })
+        }
+        Some(resource_type) => Err(Error::NotSupportedResourceType {
+            filename: path.to_path_buf(),
+            resource_type: (resource_type.to_owned()),
+        }),
+        None => Err(Error::MissingResourceType {
+            filename: path.to_owned(),
+        }),
+    }
+}
+
 fn main() {
     _ = miette::set_hook(Box::new(|_| {
         Box::new(
@@ -215,6 +298,7 @@ fn main() {
     let walker = WalkDir::new(&path).into_iter();
 
     let mut aidbox_attributes: Vec<attribute::aidbox::Attribute> = Vec::new();
+    let mut aidbox_search_params: Vec<search_param::SearchParameter> = Vec::new();
 
     for entry in walker {
         let entry = match entry {
@@ -236,43 +320,19 @@ fn main() {
         if !is_json_or_yaml(path) {
             continue;
         }
-        let file = match std::fs::File::open(path) {
-            Ok(file) => file,
+
+        match read_data(path) {
+            Ok(Data::Attribute(data)) => {
+                aidbox_attributes.push(data);
+            }
+            Ok(Data::SearchParameter(data)) => {
+                aidbox_search_params.push(data);
+            }
             Err(error) => {
                 had_errors = true;
-                eprintln!(
-                    "{:?}",
-                    miette::Report::new(Error::ReadFile {
-                        filename: path.to_owned(),
-                        source: error
-                    })
-                );
-                continue;
+                eprintln!("{:?}", miette::Report::new(error));
             }
-        };
-        let file = BufReader::new(file);
-
-        let aidbox_attribute = if is_json(path) {
-            attribute::aidbox::Attribute::from_json(file)
-        } else {
-            attribute::aidbox::Attribute::from_yaml(file)
-        };
-        let aidbox_attribute = match aidbox_attribute {
-            Ok(attribute) => attribute,
-            Err(error) => {
-                had_errors = true;
-                eprintln!(
-                    "{:?}",
-                    miette::Report::new(Error::BadAttribute {
-                        filename: path.to_owned(),
-                        source: error
-                    })
-                );
-                continue;
-            }
-        };
-
-        aidbox_attributes.push(aidbox_attribute);
+        }
     }
 
     let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
@@ -288,7 +348,7 @@ fn main() {
             had_errors = true;
             eprintln!(
                 "{:?}",
-                miette::Report::new(Error::UnknownResourceType {
+                miette::Report::new(Error::NotAllowedTargetResource {
                     resource_type: aidbox_attribute.resource.id.clone()
                 })
             )
