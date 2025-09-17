@@ -72,7 +72,7 @@ pub enum InvalidAttributeError {
     #[error("Unsupported property: isSummary")]
     #[diagnostic(help(
         "{}\n{}",
-        "isSummary makes element appear in _summary. Only FHIR itself can mark elements as summaryr.",
+        "isSummary makes element appear in _summary. Only FHIR itself can mark elements as summary.",
         "Consider removing it to conform with the FHIR spec."
     ))]
     SummaryPresent,
