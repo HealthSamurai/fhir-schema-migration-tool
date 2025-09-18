@@ -14,6 +14,8 @@ use thiserror::Error;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct SearchParameter {
+    #[serde(rename = "resourceType")]
+    pub resource_type: String,
     pub url: String,
     pub name: String,
     pub description: String,
@@ -192,6 +194,7 @@ pub fn convert(
         .join(" or ");
 
     let sp = SearchParameter {
+        resource_type: "SearchParameter".to_owned(),
         url: format!(
             "http://fhir.example.org/fhir/SearchParameter/{}",
             sp_url_component
