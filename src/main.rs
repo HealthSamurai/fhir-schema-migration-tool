@@ -10,7 +10,7 @@ use miette::Diagnostic;
 use serde_json::json;
 use std::{
     fs::File,
-    io::BufReader,
+    io::{BufReader, Write},
     path::{Path, PathBuf},
     process,
 };
@@ -161,10 +161,30 @@ pub fn make_package_json(fhir_version: FhirVersion) -> String {
     .unwrap()
 }
 
+fn write_to_archive<T: Write>(
+    archive: &mut tar::Builder<T>,
+    path: &Path,
+    payload: &[u8],
+) -> anyhow::Result<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_size(payload.len() as u64);
+    header.set_mode(0o644);
+    header.set_mtime(
+        std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0),
+    );
+    header.set_cksum();
+    archive.append_data(&mut header, path, payload)?;
+    Ok(())
+}
+
 pub fn make_package(
     output: PathBuf,
     exts: Vec<StructureDefinition>,
     profiles: Vec<StructureDefinition>,
+    search_params: Vec<search_param::fhir::SearchParameter>,
     fhir_version: FhirVersion,
 ) -> anyhow::Result<()> {
     let file = File::create(output)?;
@@ -173,17 +193,11 @@ pub fn make_package(
 
     {
         let package_json = make_package_json(fhir_version);
-        let mut header = tar::Header::new_gnu();
-        header.set_size(package_json.len() as u64);
-        header.set_mode(0o644);
-        header.set_mtime(
-            std::time::SystemTime::now()
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .map(|duration| duration.as_secs())
-                .unwrap_or(0),
-        );
-        header.set_cksum();
-        tar.append_data(&mut header, "package/package.json", package_json.as_bytes())?;
+        write_to_archive(
+            &mut tar,
+            Path::new("package/package.json"),
+            package_json.as_bytes(),
+        )?
     }
 
     for (i, ext) in exts.into_iter().enumerate() {
@@ -193,34 +207,24 @@ pub fn make_package(
         );
         let sd = serde_json::to_string_pretty(&ext).expect("Bug: invalid genereated SD");
 
-        let mut header = tar::Header::new_gnu();
-        header.set_size(sd.len() as u64);
-        header.set_mode(0o644);
-        header.set_mtime(
-            std::time::SystemTime::now()
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .map(|duration| duration.as_secs())
-                .unwrap_or(0),
-        );
-        header.set_cksum();
-        tar.append_data(&mut header, name, sd.as_bytes())?;
+        write_to_archive(&mut tar, Path::new(&name), sd.as_bytes())?
     }
 
     for (i, profile) in profiles.into_iter().enumerate() {
         let name = format!("package/StructureDefinition-{}-{}.json", &profile.name, i);
         let sd = serde_json::to_string_pretty(&profile).expect("Bug: invalid genereated SD");
 
-        let mut header = tar::Header::new_gnu();
-        header.set_size(sd.len() as u64);
-        header.set_mode(0o644);
-        header.set_mtime(
-            std::time::SystemTime::now()
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .map(|duration| duration.as_secs())
-                .unwrap_or(0),
+        write_to_archive(&mut tar, Path::new(&name), sd.as_bytes())?
+    }
+
+    for (i, sp) in search_params.into_iter().enumerate() {
+        let name = format!(
+            "package/SearchParameter-{}-{}-{}.json",
+            &sp.base[0], &sp.name, i
         );
-        header.set_cksum();
-        tar.append_data(&mut header, name, sd.as_bytes())?;
+        let sp = serde_json::to_string_pretty(&sp).expect("Bug: invalid genereated SP");
+
+        write_to_archive(&mut tar, Path::new(&name), sp.as_bytes())?
     }
 
     let gzip = tar.into_inner()?;
@@ -340,8 +344,15 @@ fn main() {
     let mut all_attributes = aidbox_attributes.clone();
     all_attributes.extend(builtin::get_builtin_resources(args.fhir_version).attribute);
 
+    let mut fhir_search_params: Vec<search_param::fhir::SearchParameter> = Vec::new();
     for aidbox_sp in aidbox_search_params {
-        let _ = search_param::fhir::convert(&all_attributes, &aidbox_sp);
+        match search_param::fhir::convert(&all_attributes, &aidbox_sp) {
+            Ok(sp) => fhir_search_params.push(sp),
+            Err(error) => {
+                had_errors = true;
+                eprintln!("{:?}", miette::Report::new(error));
+            }
+        }
     }
 
     let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
@@ -436,7 +447,13 @@ fn main() {
 
     if !had_errors || args.ignore_errors {
         if let Some(out_file) = args.output {
-            match make_package(out_file, exts, profiles, args.fhir_version) {
+            match make_package(
+                out_file,
+                exts,
+                profiles,
+                fhir_search_params,
+                args.fhir_version,
+            ) {
                 Ok(_) => (),
                 Err(error) => {
                     eprintln!("{:?}", error);
@@ -449,6 +466,9 @@ fn main() {
             }
             for profile in profiles {
                 println!("{}", serde_json::to_string_pretty(&profile).unwrap());
+            }
+            for sp in fhir_search_params {
+                println!("{}", serde_json::to_string_pretty(&sp).unwrap());
             }
         }
     }

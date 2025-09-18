@@ -207,13 +207,11 @@ pub fn convert(
     };
 
     println!("{}", serde_json::to_string_pretty(&sp).unwrap());
-
     Ok(sp)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::panic;
 
     use serde_json::Value;
