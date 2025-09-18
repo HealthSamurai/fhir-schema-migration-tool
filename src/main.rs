@@ -250,7 +250,7 @@ fn read_file(path: &Path) -> Result<serde_json::Value, Error> {
 
 #[derive(Debug)]
 enum Data {
-    Attribute(attribute::aidbox::Attribute),
+    Attribute(Box<attribute::aidbox::Attribute>),
     SearchParameter(SearchParameter),
 }
 
@@ -258,7 +258,7 @@ fn read_data(path: &Path) -> Result<Data, Error> {
     let raw_data: serde_json::Value = read_file(path)?;
     match raw_data["resourceType"].as_str() {
         Some("Attribute") => serde_json::from_value::<attribute::aidbox::Attribute>(raw_data)
-            .map(Data::Attribute)
+            .map(|attrs| Data::Attribute(Box::new(attrs)))
             .map_err(|error| Error::BadAttribute {
                 filename: path.to_owned(),
                 source: error,
@@ -325,7 +325,7 @@ fn main() {
 
         match read_data(path) {
             Ok(Data::Attribute(data)) => {
-                aidbox_attributes.push(data);
+                aidbox_attributes.push(*data);
             }
             Ok(Data::SearchParameter(data)) => {
                 aidbox_search_params.push(data);
@@ -337,11 +337,14 @@ fn main() {
         }
     }
 
-    let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
+    let mut all_attributes = aidbox_attributes.clone();
+    all_attributes.extend(builtin::get_builtin_resources(args.fhir_version).attribute);
 
     for aidbox_sp in aidbox_search_params {
-        let _ = search_param::fhir::convert(&aidbox_sp);
+        let _ = search_param::fhir::convert(&all_attributes, &aidbox_sp);
     }
+
+    let mut typed_attributes: Vec<attribute::typed::Attribute> = Vec::new();
 
     for aidbox_attribute in aidbox_attributes {
         if aidbox_attribute.resource.resource_type == "Entity"

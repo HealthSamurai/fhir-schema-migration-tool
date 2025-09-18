@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub mod fhir;
@@ -29,7 +29,7 @@ pub struct SearchParameter {
     pub expression: Vec<SearchParameterExpression>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum SearchParameterExpressionItem {
     Path(String),

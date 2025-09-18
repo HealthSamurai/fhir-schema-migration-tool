@@ -1,6 +1,12 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::{BTreeMap, HashMap},
+    vec,
+};
 
-use crate::search_param as aidbox;
+use crate::{
+    attribute::aidbox::Attribute,
+    search_param::{self as aidbox},
+};
 use miette::Diagnostic;
 use serde::Serialize;
 use serde_json::Value;
@@ -61,8 +67,15 @@ impl From<aidbox::SearchParameterType> for SearchParameterType {
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum Error {
-    #[error("The filter {} is too complex", serde_json::to_string(filter).expect("serde_json serialization fails only on non-string keys. We have string keys"))]
+    #[error("The filter {} is too complex",
+        serde_json::to_string(filter).expect("serde_json serialization fails only on non-string keys. We have string keys"))]
     TooComplexFilter { filter: BTreeMap<String, Value> },
+
+    #[error("Enum attribute not implemented for Aidbox Search Parameters {}",
+        serde_json::to_string(expression).expect("serde_json serialization fails only on non-string keys. We have string keys"))]
+    EnumAttributeNotImplemented {
+        expression: aidbox::SearchParameterExpression,
+    },
 }
 
 fn escape_fhirpath_string(s: &str) -> String {
@@ -91,11 +104,92 @@ fn filter_to_expression(filter: &BTreeMap<String, Value>) -> Result<String, Erro
     Ok(format!("where({})", vals?.join(" and ")))
 }
 
-pub fn convert(aidbox_sp: &aidbox::SearchParameter) -> Result<SearchParameter, Error> {
+fn convert_path(
+    resource_type: String,
+    attributes: &[Attribute],
+    expr: &aidbox::SearchParameterExpression,
+) -> Result<String, Error> {
+    use aidbox::SearchParameterExpressionItem::*;
+    let mut res = resource_type.to_owned();
+
+    let mut prefix: Vec<String> = Vec::new();
+
+    for item in expr {
+        let item = match item {
+            Path(item) => {
+                res.push('.');
+                item
+            }
+            Filter(filter) => {
+                res.push('.');
+                res.push_str(&filter_to_expression(filter)?);
+                continue;
+            }
+            Index(i) => {
+                res.push('[');
+                res.push_str(&i.to_string());
+                res.push(']');
+                continue;
+            }
+        };
+
+        prefix.push(item.to_owned());
+
+        let Some(attribute) = attributes.iter().find(|attr| attr.path == prefix) else {
+            res.push_str(item);
+            continue;
+        };
+
+        if attribute.r#enum.is_some() {
+            return Err(Error::EnumAttributeNotImplemented {
+                expression: expr.to_owned(),
+            });
+        }
+
+        if let Some(ext_url) = &attribute.extension_url {
+            res.push_str(&format!("extension('{}')", escape_fhirpath_string(ext_url)));
+            if let Some(target) = &attribute.r#type {
+                res.push_str(&format!(".value.ofType({})", target.id));
+            }
+        } else {
+            res.push_str(item)
+        }
+    }
+    Ok(res)
+}
+
+pub fn convert(
+    attributes: &Vec<Attribute>,
+    aidbox_sp: &aidbox::SearchParameter,
+) -> Result<SearchParameter, Error> {
+    let mut resource_type_to_attributes = HashMap::<String, Vec<Attribute>>::new();
+    for attribute in attributes {
+        resource_type_to_attributes
+            .entry(attribute.resource.id.to_owned())
+            .or_default()
+            .push(attribute.clone());
+    }
+
     let sp_url_component = match &aidbox_sp.id {
         Some(id) => format!("id-{}", id),
         None => format!("gen-{}-{}", aidbox_sp.resource.id, aidbox_sp.name),
     };
+
+    let no_attributes: Vec<Attribute> = vec![];
+    let expression = aidbox_sp
+        .expression
+        .iter()
+        .map(|expression| {
+            convert_path(
+                aidbox_sp.resource.id.to_owned(),
+                resource_type_to_attributes
+                    .get(&aidbox_sp.resource.id)
+                    .unwrap_or(&no_attributes),
+                expression,
+            )
+        })
+        .collect::<Result<Vec<String>, Error>>()?
+        .join(" or ");
 
     let sp = SearchParameter {
         url: format!(
@@ -109,26 +203,7 @@ pub fn convert(aidbox_sp: &aidbox::SearchParameter) -> Result<SearchParameter, E
         base: vec![aidbox_sp.resource.id.to_owned()],
         r#type: aidbox_sp.r#type.into(),
         target: aidbox_sp.target.to_owned(),
-        expression: aidbox_sp
-            .expression
-            .iter()
-            .map(|expression| {
-                let components: Result<Vec<String>, Error> = expression
-                    .iter()
-                    .map(|path_item| {
-                        use aidbox::SearchParameterExpressionItem::*;
-                        match path_item {
-                            Path(path) => Ok(path.to_owned()),
-                            Filter(filter) => Ok(filter_to_expression(filter)?),
-                            // FIXME: WRONG expressin: a.0.b
-                            Index(i) => Ok(i.to_string()),
-                        }
-                    })
-                    .collect();
-                Ok(components?.join("."))
-            })
-            .collect::<Result<Vec<String>, Error>>()?
-            .join(" and "),
+        expression,
     };
 
     println!("{}", serde_json::to_string_pretty(&sp).unwrap());
