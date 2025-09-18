@@ -182,9 +182,9 @@ fn write_to_archive<T: Write>(
 
 pub fn make_package(
     output: PathBuf,
-    exts: Vec<StructureDefinition>,
-    profiles: Vec<StructureDefinition>,
-    search_params: Vec<search_param::fhir::SearchParameter>,
+    exts: &Vec<StructureDefinition>,
+    profiles: &Vec<StructureDefinition>,
+    search_params: &Vec<search_param::fhir::SearchParameter>,
     fhir_version: FhirVersion,
 ) -> anyhow::Result<()> {
     let file = File::create(output)?;
@@ -449,9 +449,9 @@ fn main() {
         if let Some(out_file) = args.output {
             match make_package(
                 out_file,
-                exts,
-                profiles,
-                fhir_search_params,
+                &exts,
+                &profiles,
+                &fhir_search_params,
                 args.fhir_version,
             ) {
                 Ok(_) => (),
@@ -461,17 +461,24 @@ fn main() {
                 }
             };
         } else {
-            for ext in exts {
+            for ext in &exts {
                 println!("{}", serde_json::to_string_pretty(&ext).unwrap());
             }
-            for profile in profiles {
+            for profile in &profiles {
                 println!("{}", serde_json::to_string_pretty(&profile).unwrap());
             }
-            for sp in fhir_search_params {
+            for sp in &fhir_search_params {
                 println!("{}", serde_json::to_string_pretty(&sp).unwrap());
             }
         }
     }
+
+    println!(
+        "Extensions: {}; Profiles: {}; SearchParameters: {} generated",
+        exts.len(),
+        profiles.len(),
+        fhir_search_params.len()
+    );
 
     if had_errors {
         process::exit(1);
